@@ -345,8 +345,4 @@ POST /foods
 GET /foods
 ```
 
-The second milestone should be:
-
-```text
-GET /history/daily-summary
-```
+Historical views should reuse `GET /foods` with `date`, `from`, or `to` filters.
