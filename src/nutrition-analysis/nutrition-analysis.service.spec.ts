@@ -144,6 +144,41 @@ describe('NutritionAnalysisService', () => {
     expect(result.foodListItem).toBeNull();
   });
 
+  it('runs food creation and relation updates in one atomic transaction', async () => {
+    prisma.aiAnalysis.findFirst.mockResolvedValue(awaitingAnalysis());
+    const transaction = {
+      aiAnalysis: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn(),
+      },
+      foodEntry: {
+        create: jest.fn().mockResolvedValue({ id: 'entry-1' }),
+      },
+      foodList: { create: jest.fn() },
+      foodImage: {
+        update: jest
+          .fn()
+          .mockRejectedValue(new Error('relation update failed')),
+      },
+    };
+    prisma.$transaction.mockImplementationOnce(
+      async (callback: (client: typeof prisma) => Promise<unknown>) =>
+        callback(transaction as unknown as typeof prisma),
+    );
+
+    await expect(
+      service.acceptAnalysis('user-1', 'analysis-1', {}),
+    ).rejects.toThrow('relation update failed');
+
+    expect(transaction.aiAnalysis.updateMany).toHaveBeenCalledTimes(1);
+    expect(transaction.foodEntry.create).toHaveBeenCalledTimes(1);
+    expect(transaction.foodImage.update).toHaveBeenCalledTimes(1);
+    expect(transaction.aiAnalysis.update).not.toHaveBeenCalled();
+    expect(prisma.foodEntry.create).not.toHaveBeenCalled();
+    expect(prisma.foodImage.update).not.toHaveBeenCalled();
+    expect(prisma.aiAnalysis.update).not.toHaveBeenCalled();
+  });
+
   it('saves confirmed data to Food List only when requested', async () => {
     prisma.aiAnalysis.findFirst.mockResolvedValue(awaitingAnalysis());
     prisma.aiAnalysis.updateMany.mockResolvedValue({ count: 1 });
