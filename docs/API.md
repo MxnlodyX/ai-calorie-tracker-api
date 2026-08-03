@@ -289,6 +289,51 @@ Updates one food entry owned by the current user.
 
 Deletes one food entry owned by the current user.
 
+## Food List
+
+Reusable nutrition records owned by the current user. These are stored in `FoodList`
+and can be used by the frontend as saved foods/templates when adding meals.
+
+### `POST /food-lists`
+
+Creates a saved food nutrition item.
+
+Example request:
+
+```json
+{
+  "name": "Boiled egg",
+  "kcal": 78,
+  "proteinG": 6.3,
+  "carbG": 0.6,
+  "fatG": 5.3,
+  "description": "One large egg"
+}
+```
+
+### `GET /food-lists`
+
+Returns saved food nutrition items for the current user.
+
+Supported query params:
+
+```text
+limit
+offset
+```
+
+### `GET /food-lists/:id`
+
+Returns one saved food item owned by the current user.
+
+### `PATCH /food-lists/:id`
+
+Updates one saved food item owned by the current user.
+
+### `DELETE /food-lists/:id`
+
+Deletes one saved food item owned by the current user.
+
 ## Nutrition History
 
 ### `GET /history`
