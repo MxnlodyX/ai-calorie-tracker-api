@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -184,7 +186,38 @@ export class NutritionAnalysisService {
     );
 
     if (!response.ok) {
-      throw new ServiceUnavailableException('Unable to upload meal image');
+      const details = await this.readErrorDetails(response);
+      if (response.status === 401 || response.status === 403) {
+        throw new UnauthorizedException(
+          `Supabase storage rejected credentials: ${details}`,
+        );
+      }
+      if (response.status === 404) {
+        throw new BadRequestException(
+          `Supabase storage bucket was not found: ${bucket}`,
+        );
+      }
+      if (response.status === 409) {
+        throw new ConflictException(
+          `Supabase storage object already exists: ${storagePath}`,
+        );
+      }
+      throw new ServiceUnavailableException(
+        `Unable to upload meal image: ${details}`,
+      );
+    }
+  }
+
+  private async readErrorDetails(response: Response): Promise<string> {
+    const fallback = `Supabase returned ${response.status}`;
+    try {
+      const body = await response.text();
+      if (body.trim().length === 0) {
+        return fallback;
+      }
+      return body.slice(0, 300);
+    } catch {
+      return fallback;
     }
   }
 
