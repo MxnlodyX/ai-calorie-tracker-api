@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -45,6 +46,8 @@ const FOOD_ENTRY_SELECT = {
 
 @Injectable()
 export class NutritionAnalysisService {
+  private readonly logger = new Logger(NutritionAnalysisService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -59,14 +62,21 @@ export class NutritionAnalysisService {
     const storagePath = this.buildStoragePath(userId, file);
     await this.uploadToSupabase(bucket, storagePath, file);
 
-    const image = await this.prisma.foodImage.create({
-      data: {
-        userId,
-        storagePath,
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
-      },
-    });
+    const image = await (async () => {
+      try {
+        return await this.prisma.foodImage.create({
+          data: {
+            userId,
+            storagePath,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+          },
+        });
+      } catch (error) {
+        await this.deleteFromSupabase(bucket, storagePath);
+        throw error;
+      }
+    })();
 
     return {
       id: image.id,
@@ -458,6 +468,40 @@ export class NutritionAnalysisService {
       }
       throw new ServiceUnavailableException(
         `Unable to upload meal image: ${details}`,
+      );
+    }
+  }
+
+  private async deleteFromSupabase(
+    bucket: string,
+    storagePath: string,
+  ): Promise<void> {
+    const supabaseUrl = this.configService.getOrThrow<string>('supabase.url');
+    const serviceRoleKey = this.configService.getOrThrow<string>(
+      'supabase.serviceRoleKey',
+    );
+
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/storage/v1/object/${bucket}`,
+        {
+          method: 'DELETE',
+          headers: {
+            authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ prefixes: [storagePath] }),
+        },
+      );
+      if (!response.ok) {
+        this.logger.error(
+          `Unable to clean up Supabase object after database failure: status ${response.status}`,
+        );
+      }
+    } catch {
+      this.logger.error(
+        'Unable to clean up Supabase object after database failure',
       );
     }
   }
