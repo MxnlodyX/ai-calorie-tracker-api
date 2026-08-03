@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  image       String?
+  heightCm    Float?   @map("height_cm")
+  weightKg    Float?   @map("weight_kg")
+  dietMode    String?  @map("diet_mode")
+  kcalGoal    Int?     @map("kcal_goal")
+  proteinGoal Float?   @map("protein_goal")
+  fatGoal     Float?   @map("fat_goal")
+  carbGoal    Float?   @map("carb_goal")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  googleAccount GoogleAccount?
+  foodEntries   FoodEntry[]
+  foodLists     FoodList[]
+  foodImages    FoodImage[]
+  aiAnalyses    AiAnalysis[]
+
+  @@map("users")
+}
+
+model GoogleAccount {
+  id              String @id @default(cuid())
+  userId          String @unique @map("user_id")
+  googleAccountId String @unique @map("google_account_id")
+
+  accessToken  String? @map("access_token") @db.Text
+  refreshToken String? @map("refresh_token") @db.Text
+  expiresAt    Int?    @map("expires_at")
+  tokenType    String? @map("token_type")
+  scope        String?
+  idToken      String? @map("id_token") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("google_accounts")
+}
+
+model FoodEntry {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String
+  kcal      Int
+  proteinG  Float?   @map("protein_g")
+  fatG      Float?   @map("fat_g")
+  carbG     Float?   @map("carb_g")
+  imageUrl  String?  @map("image_url")
+  mealType  String?  @map("meal_type")
+  eatenAt   DateTime @default(now()) @map("eaten_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodImages FoodImage[]
+  aiAnalyses AiAnalysis[]
+
+  @@index([userId])
+  @@index([userId, eatenAt])
+  @@map("food_entries")
+}
+
+model FoodList {
+  id          String   @id @default(cuid())
+  name        String
+  kcal        Int
+  proteinG    Float?   @map("protein_g")
+  fatG        Float?   @map("fat_g")
+  carbG       Float?   @map("carb_g")
+  description String?  @map("description")
+  imageUrl    String?  @map("image_url")
+  mealType    String?  @map("meal_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("food_lists")
+}
+
+model FoodImage {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  foodEntryId String?  @map("food_entry_id")
+  storagePath String   @map("storage_path")
+  publicUrl   String?  @map("public_url")
+  mimeType    String   @map("mime_type")
+  sizeBytes   Int      @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodEntry  FoodEntry?   @relation(fields: [foodEntryId], references: [id], onDelete: SetNull)
+  aiAnalyses AiAnalysis[]
+
+  @@index([userId])
+  @@index([foodEntryId])
+  @@map("food_images")
+}
+
+model AiAnalysis {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  foodImageId   String?  @map("food_image_id")
+  foodEntryId   String?  @map("food_entry_id")
+  foodName      String?  @map("food_name")
+  kcal          Int?
+  proteinG      Float?   @map("protein_g")
+  fatG          Float?   @map("fat_g")
+  carbG         Float?   @map("carb_g")
+  confidence    Float?
+  provider      String?
+  model         String?
+  status        String   @default("pending")
+  rawAiResponse Json?    @map("raw_ai_response")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodImage FoodImage? @relation(fields: [foodImageId], references: [id], onDelete: SetNull)
+  foodEntry FoodEntry? @relation(fields: [foodEntryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([foodImageId])
+  @@index([foodEntryId])
+  @@map("ai_analyses")
+}
