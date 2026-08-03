@@ -10,24 +10,15 @@ Rules:
 - Totals must be numeric estimates for the whole visible meal.
 - confidence must be between 0 and 1.
 
+** Please response in THAI LANGUAGE **
 JSON schema:
 {
-  "foodName": "short meal name",
+  "foodName": "food name",
   "kcal": 0,
   "proteinG": 0,
   "fatG": 0,
   "carbG": 0,
   "confidence": 0,
-  "items": [
-    {
-      "name": "food item",
-      "portion": "estimated portion",
-      "kcal": 0,
-      "proteinG": 0,
-      "fatG": 0,
-      "carbG": 0
-    }
-  ],
   "notes": "brief uncertainty or assumptions"
 }
 `.trim();
