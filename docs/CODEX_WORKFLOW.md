@@ -35,7 +35,7 @@ Replace mock food storage with Prisma for GET /foods and POST /foods.
 ```
 
 ```text
-Add GET /history/daily-summary with date filter.
+Add date-range filtering to GET /foods.
 ```
 
 Avoid vague tasks:
