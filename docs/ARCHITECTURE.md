@@ -328,13 +328,12 @@ Recommended order:
 ```text
 1. health check
 2. authentication identity shape
-3. nutrition calculator
-4. manual food entries with mock data
-5. Prisma setup
-6. manual food entries with database
-7. nutrition history
-8. upload module
-9. AI food analysis
+3. manual food entries with mock data
+4. Prisma setup
+5. manual food entries with database
+6. nutrition history
+7. upload module
+8. AI food analysis
 ```
 
 The first real backend milestone should be:
@@ -349,6 +348,5 @@ GET /foods
 The second milestone should be:
 
 ```text
-POST /nutrition/calculate
 GET /history/daily-summary
 ```
