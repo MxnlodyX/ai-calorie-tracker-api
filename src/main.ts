@@ -10,7 +10,7 @@ async function bootstrap() {
   // Cookies are parsed before JwtStrategy reads access_token from the request.
   app.use(cookieParser());
   app.enableCors({
-    origin: configService.getOrThrow<string>('frontendUrl'),
+    origin: configService.getOrThrow<string>('frontendOrigin'),
     credentials: true,
   });
   await app.listen(Number(process.env.PORT) || 4000);
