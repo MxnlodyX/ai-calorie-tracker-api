@@ -13,7 +13,13 @@ import {
 import type { AuthenticatedRequest } from '../authentication/authentication.types';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { FoodsService } from './foods.service';
-import type { FoodEntryBody, FoodListBody, FoodQuery } from './foods.types';
+import type {
+  FoodEntryBody,
+  FoodListBody,
+  FoodQuery,
+  MealCalendarDateQuery,
+  MealCalendarMonthQuery,
+} from './foods.types';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -37,6 +43,30 @@ export class FoodsController {
     @Query() query: FoodQuery,
   ) {
     const result = await this.foodsService.listEntries(request.user.id, query);
+    return { data: result.items, meta: { total: result.total } };
+  }
+
+  @Get('meal-calendar-history')
+  async listMealCalendarMonth(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MealCalendarMonthQuery,
+  ) {
+    const result = await this.foodsService.listMealCalendarMonth(
+      request.user.id,
+      query,
+    );
+    return { data: result.items, meta: { total: result.total } };
+  }
+
+  @Get('meal-calendar-history/date')
+  async listMealCalendarDate(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MealCalendarDateQuery,
+  ) {
+    const result = await this.foodsService.listMealCalendarDate(
+      request.user.id,
+      query,
+    );
     return { data: result.items, meta: { total: result.total } };
   }
 
