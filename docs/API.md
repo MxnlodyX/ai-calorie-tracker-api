@@ -74,7 +74,14 @@ Example response:
   "id": "clx123",
   "email": "person@example.com",
   "name": "Example Person",
-  "image": "https://example.com/avatar.jpg"
+  "image": "https://example.com/avatar.jpg",
+  "heightCm": 175,
+  "weightKg": 70,
+  "dietMode": "maintain",
+  "kcalGoal": 2100,
+  "proteinGoal": 126,
+  "fatGoal": 56,
+  "carbGoal": 273
 }
 ```
 
@@ -88,6 +95,58 @@ Frontend requests that need authentication must include credentials:
 fetch('http://localhost:4000/authentications/me', {
   credentials: 'include',
 });
+```
+
+## User Profile
+
+### `GET /users/profile`
+
+Returns the current authenticated user's profile and saved nutrition goals.
+
+### `PUT /users/profile`
+
+Creates or updates the current authenticated user's profile fields. If `weightKg` and
+`dietMode` are provided and nutrition goals are not supplied manually, the backend
+calculates `kcalGoal`, `proteinGoal`, `fatGoal`, and `carbGoal`.
+
+Supported `dietMode` values:
+
+```text
+lose
+maintain
+gain
+```
+
+Example request:
+
+```json
+{
+  "name": "Example Person",
+  "heightCm": 175,
+  "weightKg": 70,
+  "dietMode": "maintain"
+}
+```
+
+Example response:
+
+```json
+{
+  "message": "User profile updated successfully",
+  "data": {
+    "id": "clx123",
+    "email": "person@example.com",
+    "name": "Example Person",
+    "image": "https://example.com/avatar.jpg",
+    "heightCm": 175,
+    "weightKg": 70,
+    "dietMode": "maintain",
+    "kcalGoal": 2100,
+    "proteinGoal": 126,
+    "fatGoal": 56,
+    "carbGoal": 273
+  }
+}
 ```
 
 ## Nutrition Calculator
