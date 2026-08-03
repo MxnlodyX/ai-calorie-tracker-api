@@ -63,11 +63,25 @@ src/
 
 ### `auth`
 
-Responsible for identifying the current user.
-
-Early development can use a temporary `dev-user`, but this must be replaced later by frontend auth integration.
+Owns Google OAuth, local user/account linking, backend JWT issuance, HttpOnly cookies, and current-user validation.
 
 Do not add Supabase Auth unless explicitly requested.
+
+Authentication flow:
+
+```text
+AuthController
+  -> GoogleOAuthGuard (create/validate OAuth state)
+  -> GoogleStrategy (normalize verified Google profile)
+  -> AuthService (link User + GoogleAccount and sign JWT)
+  -> PrismaService (persist/query PostgreSQL)
+  -> AuthController (set HttpOnly cookie and redirect)
+
+Authenticated request
+  -> JwtAuthGuard
+  -> JwtStrategy (verify JWT and reload User)
+  -> Controller receives request.user
+```
 
 ### `users`
 
@@ -166,6 +180,8 @@ Prisma service responsibilities:
 
 - database connection
 - Prisma client lifecycle
+
+API and authentication flow logs are documented in [`LOGGING.md`](./LOGGING.md).
 
 ## Data Ownership
 
@@ -280,6 +296,12 @@ PORT=4000
 FRONTEND_URL="http://localhost:3000"
 DATABASE_URL=""
 DIRECT_URL=""
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+GOOGLE_CALLBACK_URL="http://localhost:4000/authentications/google/callback"
+JWT_SECRET=""
+JWT_EXPIRES_IN="15m"
+JWT_COOKIE_MAX_AGE_MS=900000
 SUPABASE_URL=""
 SUPABASE_SERVICE_ROLE_KEY=""
 SUPABASE_STORAGE_BUCKET="food-images"
@@ -312,7 +334,7 @@ The first real backend milestone should be:
 
 ```text
 GET /health
-GET /auth/me
+GET /authentications/me
 POST /foods
 GET /foods
 ```

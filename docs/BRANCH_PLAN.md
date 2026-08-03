@@ -11,14 +11,14 @@ Includes:
 
 - basic auth module structure
 - current-user helper or request user shape
-- temporary development user fallback if frontend auth is not connected yet
+- temporary development user fallback until backend OAuth is connected
 - user model planning
 - no Supabase Auth unless explicitly requested
 
 Recommended endpoints:
 
 ```text
-GET /auth/me
+GET /authentications/me
 ```
 
 Done when:

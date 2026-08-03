@@ -55,29 +55,40 @@ Example response:
 
 ## Authentication
 
-### `GET /auth/me`
+### `GET /authentications/google`
 
-Returns the current backend user identity.
+Starts Google OAuth. The backend creates an HttpOnly OAuth state cookie and redirects the browser to Google.
 
-Early development may return a temporary `dev-user`.
+### `GET /authentications/google/callback`
+
+Google redirects to this route. The backend validates OAuth state, creates or links the local user, sets the backend-issued `access_token` HttpOnly cookie, and redirects to `FRONTEND_URL`.
+
+### `GET /authentications/me`
+
+Validates the backend-issued cookie and returns the current database user. Returns `401 Unauthorized` when the cookie is missing, expired, invalid, or belongs to a deleted user.
 
 Example response:
 
 ```json
 {
-  "data": {
-    "id": "dev-user",
-    "email": null,
-    "name": "Development User"
-  }
+  "id": "clx123",
+  "email": "person@example.com",
+  "name": "Example Person",
+  "image": "https://example.com/avatar.jpg"
 }
 ```
 
-Future behavior:
+### `POST /authentications/logout`
 
-- verify frontend authentication from NextAuth
-- do not use Supabase Auth unless explicitly requested
-- reject unauthenticated requests with `401 Unauthorized`
+Clears the backend access-token cookie and returns `204 No Content`.
+
+Frontend requests that need authentication must include credentials:
+
+```ts
+fetch('http://localhost:4000/authentications/me', {
+  credentials: 'include',
+});
+```
 
 ## Nutrition Calculator
 
