@@ -6,12 +6,15 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { MAX_NUTRITION_IMAGE_SIZE_BYTES } from './nutrition-analysis.constants';
+import {
+  DEFAULT_OPENAI_REQUEST_TIMEOUT_MS,
+  DEFAULT_SUPABASE_REQUEST_TIMEOUT_MS,
+  MAX_NUTRITION_IMAGE_SIZE_BYTES,
+} from './nutrition-analysis.constants';
 import { NUTRITION_IMAGE_ANALYSIS_SYSTEM_PROMPT } from './nutrition-analysis.prompts';
 import type {
   ConfirmNutritionAnalysisBody,
@@ -402,7 +405,7 @@ export class NutritionAnalysisService {
     const serviceRoleKey = this.configService.getOrThrow<string>(
       'supabase.serviceRoleKey',
     );
-    const response = await fetch(
+    const response = await this.fetchExternal(
       `${supabaseUrl}/storage/v1/object/${bucket}/${storagePath}`,
       {
         headers: {
@@ -410,12 +413,14 @@ export class NutritionAnalysisService {
           apikey: serviceRoleKey,
         },
       },
+      'supabase.requestTimeoutMs',
+      DEFAULT_SUPABASE_REQUEST_TIMEOUT_MS,
+      'Supabase download',
+      'Unable to load meal image',
     );
     if (!response.ok) {
-      const details = await this.readErrorDetails(response);
-      throw new ServiceUnavailableException(
-        `Unable to load meal image: ${details}`,
-      );
+      this.logUpstreamResponseFailure('Supabase download', response.status);
+      throw new ServiceUnavailableException('Unable to load meal image');
     }
     const buffer = Buffer.from(await response.arrayBuffer());
     return {
@@ -435,7 +440,7 @@ export class NutritionAnalysisService {
     const serviceRoleKey = this.configService.getOrThrow<string>(
       'supabase.serviceRoleKey',
     );
-    const response = await fetch(
+    const response = await this.fetchExternal(
       `${supabaseUrl}/storage/v1/object/${bucket}/${storagePath}`,
       {
         method: 'POST',
@@ -447,28 +452,18 @@ export class NutritionAnalysisService {
         },
         body: file.buffer as unknown as BodyInit,
       },
+      'supabase.requestTimeoutMs',
+      DEFAULT_SUPABASE_REQUEST_TIMEOUT_MS,
+      'Supabase upload',
+      'Unable to upload meal image',
     );
 
     if (!response.ok) {
-      const details = await this.readErrorDetails(response);
-      if (response.status === 401 || response.status === 403) {
-        throw new UnauthorizedException(
-          `Supabase storage rejected credentials: ${details}`,
-        );
-      }
-      if (response.status === 404) {
-        throw new BadRequestException(
-          `Supabase storage bucket was not found: ${bucket}`,
-        );
-      }
+      this.logUpstreamResponseFailure('Supabase upload', response.status);
       if (response.status === 409) {
-        throw new ConflictException(
-          `Supabase storage object already exists: ${storagePath}`,
-        );
+        throw new ConflictException('Meal image already exists');
       }
-      throw new ServiceUnavailableException(
-        `Unable to upload meal image: ${details}`,
-      );
+      throw new ServiceUnavailableException('Unable to upload meal image');
     }
   }
 
@@ -482,7 +477,7 @@ export class NutritionAnalysisService {
     );
 
     try {
-      const response = await fetch(
+      const response = await this.fetchExternal(
         `${supabaseUrl}/storage/v1/object/${bucket}`,
         {
           method: 'DELETE',
@@ -493,6 +488,10 @@ export class NutritionAnalysisService {
           },
           body: JSON.stringify({ prefixes: [storagePath] }),
         },
+        'supabase.requestTimeoutMs',
+        DEFAULT_SUPABASE_REQUEST_TIMEOUT_MS,
+        'Supabase cleanup',
+        'Unable to clean up meal image',
       );
       if (!response.ok) {
         this.logger.error(
@@ -506,63 +505,58 @@ export class NutritionAnalysisService {
     }
   }
 
-  private async readErrorDetails(response: Response): Promise<string> {
-    const fallback = `Supabase returned ${response.status}`;
-    try {
-      const body = await response.text();
-      if (body.trim().length === 0) {
-        return fallback;
-      }
-      return body.slice(0, 300);
-    } catch {
-      return fallback;
-    }
-  }
-
   private async requestOpenAiAnalysis(
     file: UploadedFile,
     model: string,
   ): Promise<NutritionAnalysisResult> {
     const apiKey = this.configService.getOrThrow<string>('openai.apiKey');
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
+    const response = await this.fetchExternal(
+      'https://api.openai.com/v1/responses',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          input: [
+            {
+              role: 'system',
+              content: [
+                {
+                  type: 'input_text',
+                  text: NUTRITION_IMAGE_ANALYSIS_SYSTEM_PROMPT,
+                },
+              ],
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: 'Analyze this meal image for nutrition tracking.',
+                },
+                {
+                  type: 'input_image',
+                  image_url: `data:${file.mimetype};base64,${file.buffer.toString(
+                    'base64',
+                  )}`,
+                },
+              ],
+            },
+          ],
+          text: { format: { type: 'json_object' } },
+        }),
       },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content: [
-              {
-                type: 'input_text',
-                text: NUTRITION_IMAGE_ANALYSIS_SYSTEM_PROMPT,
-              },
-            ],
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: 'Analyze this meal image for nutrition tracking.',
-              },
-              {
-                type: 'input_image',
-                image_url: `data:${file.mimetype};base64,${file.buffer.toString(
-                  'base64',
-                )}`,
-              },
-            ],
-          },
-        ],
-        text: { format: { type: 'json_object' } },
-      }),
-    });
+      'openai.requestTimeoutMs',
+      DEFAULT_OPENAI_REQUEST_TIMEOUT_MS,
+      'OpenAI analysis',
+      'Unable to analyze meal image',
+    );
 
     if (!response.ok) {
+      this.logUpstreamResponseFailure('OpenAI analysis', response.status);
       throw new ServiceUnavailableException('Unable to analyze meal image');
     }
 
@@ -573,6 +567,39 @@ export class NutritionAnalysisService {
     }
 
     return this.parseNutritionResult(outputText);
+  }
+
+  private async fetchExternal(
+    input: string,
+    init: RequestInit,
+    timeoutConfigKey: string,
+    defaultTimeoutMs: number,
+    operation: string,
+    clientErrorMessage: string,
+  ): Promise<Response> {
+    const timeoutMs = this.requestTimeoutMs(timeoutConfigKey, defaultTimeoutMs);
+    try {
+      return await fetch(input, {
+        ...init,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch {
+      this.logger.error(`${operation} request did not complete`);
+      throw new ServiceUnavailableException(clientErrorMessage);
+    }
+  }
+
+  private requestTimeoutMs(configKey: string, fallback: number): number {
+    const configured = this.configService.get<number>(configKey);
+    return Number.isSafeInteger(configured) &&
+      configured !== undefined &&
+      configured > 0
+      ? configured
+      : fallback;
+  }
+
+  private logUpstreamResponseFailure(operation: string, status: number): void {
+    this.logger.error(`${operation} failed with status ${status}`);
   }
 
   private extractOutputText(
