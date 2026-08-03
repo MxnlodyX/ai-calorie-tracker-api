@@ -11,6 +11,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { AuthenticatedRequest } from '../authentication/authentication.types';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
+import { MAX_NUTRITION_IMAGE_SIZE_BYTES } from './nutrition-analysis.constants';
 import { NutritionAnalysisService } from './nutrition-analysis.service';
 import type {
   ConfirmNutritionAnalysisBody,
@@ -32,7 +33,11 @@ export class NutritionAnalysisController {
   ) {}
 
   @Post('upload/food-image')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: MAX_NUTRITION_IMAGE_SIZE_BYTES },
+    }),
+  )
   async uploadImage(
     @Req() request: AuthenticatedRequest,
     @UploadedFile() image: UploadedMealImage,
