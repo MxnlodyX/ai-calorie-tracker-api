@@ -35,13 +35,6 @@ model GoogleAccount {
   userId          String @unique @map("user_id")
   googleAccountId String @unique @map("google_account_id")
 
-  accessToken  String? @map("access_token") @db.Text
-  refreshToken String? @map("refresh_token") @db.Text
-  expiresAt    Int?    @map("expires_at")
-  tokenType    String? @map("token_type")
-  scope        String?
-  idToken      String? @map("id_token") @db.Text
-
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -98,7 +91,6 @@ model FoodImage {
   userId      String   @map("user_id")
   foodEntryId String?  @map("food_entry_id")
   storagePath String   @map("storage_path")
-  publicUrl   String?  @map("public_url")
   mimeType    String   @map("mime_type")
   sizeBytes   Int      @map("size_bytes")
   createdAt   DateTime @default(now()) @map("created_at")
