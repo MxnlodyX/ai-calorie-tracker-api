@@ -43,6 +43,7 @@ type FoodEntryCreateData = Omit<Prisma.FoodEntryUncheckedCreateInput, 'userId'>;
 type FoodEntryUpdateData = Prisma.FoodEntryUncheckedUpdateInput;
 type FoodListCreateData = Omit<Prisma.FoodListUncheckedCreateInput, 'userId'>;
 type FoodListUpdateData = Prisma.FoodListUncheckedUpdateInput;
+const MAX_PAGINATION_LIMIT = 100;
 
 @Injectable()
 export class FoodsService {
@@ -260,8 +261,14 @@ export class FoodsService {
   }
 
   private parsePagination(query: FoodQuery): { limit: number; offset: number } {
+    const limit = this.optionalPositiveInteger(query.limit, 'limit') ?? 50;
+    if (limit > MAX_PAGINATION_LIMIT) {
+      throw new BadRequestException(
+        `limit must be at most ${MAX_PAGINATION_LIMIT}`,
+      );
+    }
     return {
-      limit: this.optionalPositiveInteger(query.limit, 'limit') ?? 50,
+      limit,
       offset: this.optionalNonNegativeInteger(query.offset, 'offset') ?? 0,
     };
   }
