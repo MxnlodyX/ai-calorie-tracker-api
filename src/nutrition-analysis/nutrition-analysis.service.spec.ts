@@ -78,6 +78,44 @@ describe('NutritionAnalysisService', () => {
     expect(result.id).toBe('image-1');
   });
 
+  it('deletes the uploaded object when the image record cannot be created', async () => {
+    const databaseError = new Error('database unavailable');
+    fetchMock
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true });
+    prisma.foodImage.create.mockRejectedValueOnce(databaseError);
+
+    await expect(service.uploadImage('user-1', mealImage())).rejects.toBe(
+      databaseError,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.supabase.co/storage/v1/object/meal-images',
+      expect.objectContaining({
+        method: 'DELETE',
+        body: expect.stringMatching(
+          /^\{"prefixes":\["users\/user-1\/meal-images\/.+\.jpg"\]\}$/,
+        ) as string,
+      }),
+    );
+  });
+
+  it('preserves the database error when storage cleanup also fails', async () => {
+    const databaseError = new Error('database unavailable');
+    fetchMock
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+    prisma.foodImage.create.mockRejectedValueOnce(databaseError);
+
+    await expect(service.uploadImage('user-1', mealImage())).rejects.toBe(
+      databaseError,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('analyzes an owned upload and waits for confirmation', async () => {
     prisma.foodImage.findFirst.mockResolvedValue({
       id: 'image-1',
