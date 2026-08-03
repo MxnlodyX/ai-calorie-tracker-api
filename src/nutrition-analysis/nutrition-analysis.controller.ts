@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Param,
   Post,
   Req,
   UploadedFile,
@@ -11,7 +12,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { AuthenticatedRequest } from '../authentication/authentication.types';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { NutritionAnalysisService } from './nutrition-analysis.service';
-import type { NutritionAnalyzeBody } from './nutrition-analysis.types';
+import type {
+  ConfirmNutritionAnalysisBody,
+  NutritionAnalyzeBody,
+} from './nutrition-analysis.types';
 
 type UploadedMealImage = {
   buffer: Buffer;
@@ -20,26 +24,97 @@ type UploadedMealImage = {
   size: number;
 };
 
-@Controller('nutrition')
+@Controller()
 @UseGuards(JwtAuthGuard)
 export class NutritionAnalysisController {
   constructor(
     private readonly nutritionAnalysisService: NutritionAnalysisService,
   ) {}
 
-  @Post('analyze-image')
+  @Post('upload/food-image')
   @UseInterceptors(FileInterceptor('image'))
-  async analyzeImage(
+  async uploadImage(
     @Req() request: AuthenticatedRequest,
     @UploadedFile() image: UploadedMealImage,
+  ) {
+    return {
+      message: 'Food image uploaded successfully',
+      data: await this.nutritionAnalysisService.uploadImage(
+        request.user.id,
+        image,
+      ),
+    };
+  }
+
+  @Post('analyze/food-image')
+  async analyzeImage(
+    @Req() request: AuthenticatedRequest,
     @Body() body: NutritionAnalyzeBody,
   ) {
     return {
-      message: 'Meal image analyzed successfully',
+      message: 'Food image analyzed successfully',
       data: await this.nutritionAnalysisService.analyzeImage(
         request.user.id,
-        image,
         body,
+      ),
+    };
+  }
+
+  @Post('foods/from-analysis')
+  async createFoodFromAnalysis(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: ConfirmNutritionAnalysisBody,
+  ) {
+    return {
+      message: 'AI analysis accepted and food entry created successfully',
+      data: await this.nutritionAnalysisService.acceptAnalysis(
+        request.user.id,
+        body.analysisId,
+        body,
+      ),
+    };
+  }
+
+  @Post('analyze/:analysisId/accept')
+  async acceptAnalysis(
+    @Req() request: AuthenticatedRequest,
+    @Param('analysisId') analysisId: string,
+    @Body() body: ConfirmNutritionAnalysisBody,
+  ) {
+    return {
+      message: 'AI analysis accepted and food entry created successfully',
+      data: await this.nutritionAnalysisService.acceptAnalysis(
+        request.user.id,
+        analysisId,
+        body,
+      ),
+    };
+  }
+
+  @Post('analyze/:analysisId/reject')
+  async rejectAnalysis(
+    @Req() request: AuthenticatedRequest,
+    @Param('analysisId') analysisId: string,
+  ) {
+    return {
+      message: 'AI analysis rejected successfully',
+      data: await this.nutritionAnalysisService.rejectAnalysis(
+        request.user.id,
+        analysisId,
+      ),
+    };
+  }
+
+  @Post('analyze/:analysisId/retry')
+  async retryAnalysis(
+    @Req() request: AuthenticatedRequest,
+    @Param('analysisId') analysisId: string,
+  ) {
+    return {
+      message: 'Food image analyzed again successfully',
+      data: await this.nutritionAnalysisService.retryAnalysis(
+        request.user.id,
+        analysisId,
       ),
     };
   }
