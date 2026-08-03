@@ -431,7 +431,8 @@ Example response:
 
 ### `POST /analyze/food-image`
 
-Analyzes an uploaded food image.
+Analyzes a previously uploaded food image. This endpoint saves an AI analysis in
+`awaiting_confirmation` status and never creates a `FoodEntry` or `FoodList` item.
 
 Example request:
 
@@ -447,23 +448,34 @@ Example response:
 {
   "message": "Food image analyzed successfully",
   "data": {
-    "foodName": "Chicken rice",
-    "calories": 620,
-    "proteinG": 35,
-    "carbsG": 70,
-    "fatG": 20,
-    "confidence": 0.78,
-    "analysisId": "analysis_123"
+    "analysis": {
+      "id": "analysis_123",
+      "foodName": "Chicken rice",
+      "kcal": 620,
+      "proteinG": 35,
+      "carbG": 70,
+      "fatG": 20,
+      "confidence": 0.78,
+      "status": "awaiting_confirmation"
+    },
+    "image": {
+      "id": "img_123",
+      "storagePath": "users/user_123/meal-images/image.jpg"
+    }
   }
 }
 ```
 
 Important:
-AI output must be treated as an estimate. The frontend should allow the user to confirm or edit the result.
+AI output must be treated as an estimate. The frontend must let the user accept,
+edit, reject, or retry the result before creating a food entry.
 
 ### `POST /foods/from-analysis`
 
-Creates a food entry from a confirmed AI analysis result.
+Accepts a confirmed AI analysis and creates one food entry. Submitted nutrition
+fields override the AI estimate. `saveToFoodList` is optional and defaults to
+`false`; a reusable Food List item is created only when the user explicitly sets it
+to `true`.
 
 Example request:
 
@@ -474,6 +486,32 @@ Example request:
   "calories": 620,
   "proteinG": 35,
   "carbsG": 70,
-  "fatG": 20
+  "fatG": 20,
+  "mealType": "lunch",
+  "eatenAt": "2026-08-04T05:00:00.000Z",
+  "saveToFoodList": false
 }
+```
+
+The same accept operation is also available as
+`POST /analyze/:analysisId/accept`, with `analysisId` supplied in the URL.
+
+### `POST /analyze/:analysisId/reject`
+
+Rejects an analysis in `awaiting_confirmation` status. No food entry or Food List
+item is created.
+
+### `POST /analyze/:analysisId/retry`
+
+Runs AI analysis again against the same uploaded image. Retry is allowed for
+`awaiting_confirmation` and `failed` analyses. A successful retry returns the
+analysis to `awaiting_confirmation` and still creates no food data.
+
+Analysis statuses:
+
+```text
+pending -> awaiting_confirmation -> accepted
+                              |----> rejected
+pending -> failed -> pending (retry)
+awaiting_confirmation -> pending (retry)
 ```
