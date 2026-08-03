@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NUTRITION_IMAGE_ANALYSIS_SYSTEM_PROMPT } from './nutrition-analysis.prompts';
 import type {
+  ConfirmNutritionAnalysisBody,
   NutritionAnalysisResult,
   NutritionAnalyzeBody,
 } from './nutrition-analysis.types';
@@ -48,11 +50,7 @@ export class NutritionAnalysisService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async analyzeImage(
-    userId: string,
-    file: UploadedFile,
-    body: NutritionAnalyzeBody,
-  ) {
+  async uploadImage(userId: string, file: UploadedFile) {
     this.validateImage(file);
 
     const bucket = this.configService.getOrThrow<string>(
@@ -61,7 +59,7 @@ export class NutritionAnalysisService {
     const storagePath = this.buildStoragePath(userId, file);
     await this.uploadToSupabase(bucket, storagePath, file);
 
-    const foodImage = await this.prisma.foodImage.create({
+    const image = await this.prisma.foodImage.create({
       data: {
         userId,
         storagePath,
@@ -69,6 +67,33 @@ export class NutritionAnalysisService {
         sizeBytes: file.size,
       },
     });
+
+    return {
+      id: image.id,
+      storagePath,
+      publicUrl: image.publicUrl ?? null,
+      mimeType: file.mimetype,
+      sizeBytes: file.size,
+      bucket,
+    };
+  }
+
+  async analyzeImage(userId: string, body: NutritionAnalyzeBody) {
+    const foodImageId = this.requiredRequestString(
+      body.foodImageId,
+      'foodImageId',
+    );
+    const foodImage = await this.prisma.foodImage.findFirst({
+      where: { id: foodImageId, userId },
+    });
+    if (!foodImage) {
+      throw new NotFoundException('Food image was not found');
+    }
+
+    const file = await this.downloadFromSupabase(
+      foodImage.storagePath,
+      foodImage.mimeType,
+    );
 
     const model =
       this.configService.get<string>('openai.imageAnalysisModel') ??
@@ -84,68 +109,262 @@ export class NutritionAnalysisService {
     });
 
     try {
-      const nutrition = await this.requestOpenAiAnalysis(file, model);
-      const eatenAt = this.optionalDate(body.eatenAt, 'eatenAt') ?? undefined;
-      const mealType = this.optionalString(body.mealType, 'mealType');
-
-      const [foodEntry, aiAnalysis] = await this.prisma.$transaction([
-        this.prisma.foodEntry.create({
-          data: {
-            userId,
-            name: nutrition.foodName,
-            kcal: nutrition.kcal,
-            proteinG: nutrition.proteinG,
-            fatG: nutrition.fatG,
-            carbG: nutrition.carbG,
-            imageUrl: storagePath,
-            mealType,
-            eatenAt,
-          },
-          select: FOOD_ENTRY_SELECT,
-        }),
-        this.prisma.aiAnalysis.update({
-          where: { id: pendingAnalysis.id },
-          data: {
-            foodName: nutrition.foodName,
-            kcal: nutrition.kcal,
-            proteinG: nutrition.proteinG,
-            fatG: nutrition.fatG,
-            carbG: nutrition.carbG,
-            confidence: nutrition.confidence,
-            status: 'completed',
-            rawAiResponse: nutrition,
-          },
-        }),
-      ]);
-
-      await this.prisma.foodImage.update({
-        where: { id: foodImage.id },
-        data: { foodEntryId: foodEntry.id },
-      });
-      await this.prisma.aiAnalysis.update({
-        where: { id: aiAnalysis.id },
-        data: { foodEntryId: foodEntry.id },
-      });
+      const aiAnalysis = await this.completeAnalysis(
+        pendingAnalysis.id,
+        file,
+        model,
+        body,
+      );
 
       return {
-        foodEntry,
         analysis: aiAnalysis,
         image: {
           id: foodImage.id,
-          storagePath,
-          bucket,
+          storagePath: foodImage.storagePath,
         },
       };
     } catch (error) {
-      await this.prisma.aiAnalysis.update({
-        where: { id: pendingAnalysis.id },
-        data: {
-          status: 'failed',
-          rawAiResponse: this.serializeFailure(error),
-        },
-      });
+      await this.markAnalysisFailed(pendingAnalysis.id, error);
       throw error;
     }
+  }
+
+  async acceptAnalysis(
+    userId: string,
+    analysisIdValue: unknown,
+    body: ConfirmNutritionAnalysisBody,
+  ) {
+    const analysisId = this.requiredRequestString(
+      analysisIdValue,
+      'analysisId',
+    );
+    const analysis = await this.findOwnedAnalysis(userId, analysisId);
+    if (analysis.status !== 'awaiting_confirmation' || analysis.foodEntryId) {
+      throw new ConflictException('AI analysis is not awaiting confirmation');
+    }
+
+    const defaults = this.readEntryDefaults(analysis.rawAiResponse);
+    const name = this.requiredRequestString(
+      body.name ?? body.foodName ?? analysis.foodName,
+      'foodName',
+    );
+    const kcal = this.requiredPositiveInteger(
+      body.kcal ?? body.calories ?? analysis.kcal,
+      'kcal',
+    );
+    const proteinG = this.requestOptionalNonNegativeNumber(
+      body.proteinG === undefined ? analysis.proteinG : body.proteinG,
+      'proteinG',
+    );
+    const fatG = this.requestOptionalNonNegativeNumber(
+      body.fatG === undefined ? analysis.fatG : body.fatG,
+      'fatG',
+    );
+    const carbG = this.requestOptionalNonNegativeNumber(
+      body.carbG ?? body.carbsG ?? analysis.carbG,
+      'carbG',
+    );
+    const mealType = this.optionalString(
+      body.mealType === undefined ? defaults.mealType : body.mealType,
+      'mealType',
+    );
+    const eatenAt =
+      this.optionalDate(
+        body.eatenAt === undefined ? defaults.eatenAt : body.eatenAt,
+        'eatenAt',
+      ) ?? undefined;
+    const saveToFoodList = this.optionalBoolean(
+      body.saveToFoodList,
+      'saveToFoodList',
+    );
+
+    return this.prisma.$transaction(async (transaction) => {
+      const claimed = await transaction.aiAnalysis.updateMany({
+        where: {
+          id: analysisId,
+          userId,
+          status: 'awaiting_confirmation',
+          foodEntryId: null,
+        },
+        data: { status: 'accepted' },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException('AI analysis was already handled');
+      }
+
+      const foodEntry = await transaction.foodEntry.create({
+        data: {
+          userId,
+          name,
+          kcal,
+          proteinG,
+          fatG,
+          carbG,
+          imageUrl: analysis.foodImage?.storagePath,
+          mealType,
+          eatenAt,
+        },
+        select: FOOD_ENTRY_SELECT,
+      });
+      const foodListItem = saveToFoodList
+        ? await transaction.foodList.create({
+            data: {
+              userId,
+              name,
+              kcal,
+              proteinG,
+              fatG,
+              carbG,
+              imageUrl: analysis.foodImage?.storagePath,
+              mealType,
+            },
+          })
+        : null;
+
+      if (analysis.foodImageId) {
+        await transaction.foodImage.update({
+          where: { id: analysis.foodImageId },
+          data: { foodEntryId: foodEntry.id },
+        });
+      }
+      const acceptedAnalysis = await transaction.aiAnalysis.update({
+        where: { id: analysisId },
+        data: { foodEntryId: foodEntry.id },
+      });
+
+      return { foodEntry, foodListItem, analysis: acceptedAnalysis };
+    });
+  }
+
+  async rejectAnalysis(userId: string, analysisId: string) {
+    const analysis = await this.findOwnedAnalysis(userId, analysisId);
+    if (analysis.status !== 'awaiting_confirmation') {
+      throw new ConflictException('AI analysis is not awaiting confirmation');
+    }
+    const rejected = await this.prisma.aiAnalysis.updateMany({
+      where: { id: analysisId, userId, status: 'awaiting_confirmation' },
+      data: { status: 'rejected' },
+    });
+    if (rejected.count !== 1) {
+      throw new ConflictException('AI analysis was already handled');
+    }
+    return this.prisma.aiAnalysis.findUniqueOrThrow({
+      where: { id: analysisId },
+    });
+  }
+
+  async retryAnalysis(userId: string, analysisId: string) {
+    const analysis = await this.findOwnedAnalysis(userId, analysisId);
+    if (!['awaiting_confirmation', 'failed'].includes(analysis.status)) {
+      throw new ConflictException('AI analysis cannot be retried');
+    }
+    if (!analysis.foodImage) {
+      throw new BadRequestException('AI analysis has no image to retry');
+    }
+
+    const claimed = await this.prisma.aiAnalysis.updateMany({
+      where: {
+        id: analysisId,
+        userId,
+        status: { in: ['awaiting_confirmation', 'failed'] },
+      },
+      data: { status: 'pending' },
+    });
+    if (claimed.count !== 1) {
+      throw new ConflictException('AI analysis is already being retried');
+    }
+
+    try {
+      const file = await this.downloadFromSupabase(
+        analysis.foodImage.storagePath,
+        analysis.foodImage.mimeType,
+      );
+      return await this.completeAnalysis(
+        analysisId,
+        file,
+        analysis.model ?? DEFAULT_OPENAI_MODEL,
+        this.readEntryDefaults(analysis.rawAiResponse),
+      );
+    } catch (error) {
+      await this.markAnalysisFailed(analysisId, error);
+      throw error;
+    }
+  }
+
+  private async completeAnalysis(
+    analysisId: string,
+    file: UploadedFile,
+    model: string,
+    entryDefaults: { mealType?: unknown; eatenAt?: unknown },
+  ) {
+    const mealType = this.optionalString(entryDefaults.mealType, 'mealType');
+    const eatenAt = this.optionalDate(entryDefaults.eatenAt, 'eatenAt');
+    const nutrition = await this.requestOpenAiAnalysis(file, model);
+
+    return this.prisma.aiAnalysis.update({
+      where: { id: analysisId },
+      data: {
+        foodName: nutrition.foodName,
+        kcal: nutrition.kcal,
+        proteinG: nutrition.proteinG,
+        fatG: nutrition.fatG,
+        carbG: nutrition.carbG,
+        confidence: nutrition.confidence,
+        status: 'awaiting_confirmation',
+        rawAiResponse: {
+          nutrition,
+          entryDefaults: {
+            mealType: mealType ?? null,
+            eatenAt: eatenAt?.toISOString() ?? null,
+          },
+        },
+      },
+    });
+  }
+
+  private async markAnalysisFailed(
+    analysisId: string,
+    error: unknown,
+  ): Promise<void> {
+    await this.prisma.aiAnalysis.update({
+      where: { id: analysisId },
+      data: {
+        status: 'failed',
+        rawAiResponse: this.serializeFailure(error),
+      },
+    });
+  }
+
+  private async findOwnedAnalysis(userId: string, analysisId: string) {
+    const analysis = await this.prisma.aiAnalysis.findFirst({
+      where: { id: analysisId, userId },
+      include: { foodImage: true },
+    });
+    if (!analysis) {
+      throw new NotFoundException('AI analysis was not found');
+    }
+    return analysis;
+  }
+
+  private readEntryDefaults(value: Prisma.JsonValue): {
+    mealType?: unknown;
+    eatenAt?: unknown;
+  } {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    const entryDefaults = value.entryDefaults;
+    if (
+      !entryDefaults ||
+      typeof entryDefaults !== 'object' ||
+      Array.isArray(entryDefaults)
+    ) {
+      return {};
+    }
+    return {
+      mealType: entryDefaults.mealType,
+      eatenAt: entryDefaults.eatenAt,
+    };
   }
 
   private validateImage(
@@ -158,8 +377,43 @@ export class NutritionAnalysisService {
       throw new BadRequestException('image must be JPEG, PNG, or WebP');
     }
     if (file.size <= 0 || file.size > MAX_IMAGE_SIZE_BYTES) {
-      throw new BadRequestException('image must be between 1 byte and 10MB');
+      throw new BadRequestException('image must be between 1 byte and 5MB');
     }
+  }
+
+  private async downloadFromSupabase(
+    storagePath: string,
+    mimeType: string,
+  ): Promise<UploadedFile> {
+    const bucket = this.configService.getOrThrow<string>(
+      'supabase.storageBucket',
+    );
+    const supabaseUrl = this.configService.getOrThrow<string>('supabase.url');
+    const serviceRoleKey = this.configService.getOrThrow<string>(
+      'supabase.serviceRoleKey',
+    );
+    const response = await fetch(
+      `${supabaseUrl}/storage/v1/object/${bucket}/${storagePath}`,
+      {
+        headers: {
+          authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+      },
+    );
+    if (!response.ok) {
+      const details = await this.readErrorDetails(response);
+      throw new ServiceUnavailableException(
+        `Unable to load meal image: ${details}`,
+      );
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return {
+      buffer,
+      originalname: storagePath.split('/').at(-1) ?? 'meal-image',
+      mimetype: mimeType,
+      size: buffer.length,
+    };
   }
 
   private async uploadToSupabase(
@@ -376,6 +630,56 @@ export class NutritionAnalysisService {
           ? error.message
           : 'Unknown image analysis failure',
     };
+  }
+
+  private requiredRequestString(value: unknown, field: string): string {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new BadRequestException(`${field} is required`);
+    }
+    return value.trim();
+  }
+
+  private requiredPositiveInteger(value: unknown, field: string): number {
+    const number = this.parseRequestNumber(value);
+    if (number === undefined || !Number.isInteger(number) || number <= 0) {
+      throw new BadRequestException(`${field} must be a positive integer`);
+    }
+    return number;
+  }
+
+  private requestOptionalNonNegativeNumber(
+    value: unknown,
+    field: string,
+  ): number | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const number = this.parseRequestNumber(value);
+    if (number === undefined || !Number.isFinite(number) || number < 0) {
+      throw new BadRequestException(`${field} must be a non-negative number`);
+    }
+    return number;
+  }
+
+  private optionalBoolean(value: unknown, field: string): boolean {
+    if (value === undefined) {
+      return false;
+    }
+    if (typeof value !== 'boolean') {
+      throw new BadRequestException(`${field} must be a boolean`);
+    }
+    return value;
+  }
+
+  private parseRequestNumber(value: unknown): number | undefined {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return undefined;
+    }
+    const number = Number(value);
+    return Number.isNaN(number) ? undefined : number;
   }
 
   private requiredString(value: unknown, field: string): string {
