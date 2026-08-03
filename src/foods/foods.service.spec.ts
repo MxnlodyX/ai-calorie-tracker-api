@@ -91,6 +91,19 @@ describe('FoodsService', () => {
     });
   });
 
+  it('rejects pagination limits above 100 before querying the database', async () => {
+    await expect(
+      service.listEntries('user-1', { limit: '101' }),
+    ).rejects.toThrow('limit must be at most 100');
+    await expect(
+      service.listFoodListItems('user-1', { limit: 101 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.foodEntry.findMany).not.toHaveBeenCalled();
+    expect(prisma.foodList.findMany).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('lists food entries for a calendar month', async () => {
     prisma.foodEntry.findMany.mockResolvedValue([]);
     prisma.foodEntry.count.mockResolvedValue(0);
