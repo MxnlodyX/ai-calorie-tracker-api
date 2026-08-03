@@ -27,31 +27,28 @@ Done when:
 - protected endpoints have a clear future path
 - auth strategy is documented
 
-## 2. `feature/user-nutrition-calculator`
+## 2. `feature/user-nutrition-profile`
 
 Goal:
-Calculate a user's calorie and macro targets.
+Store a user's profile and daily calorie and macro targets.
 
 Includes:
 
 - user profile nutrition fields
-- BMR calculation
-- TDEE calculation
-- goal adjustment for lose, maintain, or gain
-- macro target calculation
+- saved calorie and macro targets
+- goal mode for lose, maintain, or gain
 
 Recommended endpoints:
 
 ```text
-POST /nutrition/calculate
-GET  /nutrition/target
-PUT  /nutrition/target
+GET /users/profile
+PUT /users/profile
 ```
 
 Done when:
 
 - user can save nutrition profile inputs
-- backend returns daily calorie and macro targets
+- backend returns the saved daily calorie and macro targets with the profile
 - validation rejects invalid values
 
 ## 3. `feature/add-menu-toggle`
