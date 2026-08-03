@@ -64,7 +64,6 @@ describe('NutritionAnalysisService', () => {
     fetchMock.mockResolvedValueOnce({ ok: true });
     prisma.foodImage.create.mockResolvedValue({
       id: 'image-1',
-      publicUrl: null,
     });
 
     const result = await service.uploadImage('user-1', mealImage());
