@@ -15,11 +15,13 @@ describe('NutritionAnalysisService', () => {
     $transaction: jest.fn(),
     foodImage: {
       create: jest.fn(),
+      deleteMany: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
     },
     aiAnalysis: {
       create: jest.fn(),
+      count: jest.fn(),
       findFirst: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
@@ -48,6 +50,8 @@ describe('NutritionAnalysisService', () => {
       async (callback: (client: typeof prisma) => Promise<unknown>) =>
         callback(prisma),
     );
+    prisma.aiAnalysis.count.mockResolvedValue(0);
+    prisma.foodImage.deleteMany.mockResolvedValue({ count: 1 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -291,6 +295,7 @@ describe('NutritionAnalysisService', () => {
   it('rejects an analysis without creating any food data', async () => {
     prisma.aiAnalysis.findFirst.mockResolvedValue(awaitingAnalysis());
     prisma.aiAnalysis.updateMany.mockResolvedValue({ count: 1 });
+    fetchMock.mockResolvedValueOnce({ ok: true });
     prisma.aiAnalysis.findUniqueOrThrow.mockResolvedValue({
       id: 'analysis-1',
       status: 'rejected',
@@ -299,8 +304,73 @@ describe('NutritionAnalysisService', () => {
     const result = await service.rejectAnalysis('user-1', 'analysis-1');
 
     expect(result.status).toBe('rejected');
+    expect(prisma.aiAnalysis.count).toHaveBeenCalledWith({
+      where: {
+        foodImageId: 'image-1',
+        status: { not: 'rejected' },
+      },
+    });
+    expect(prisma.foodImage.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'image-1',
+        foodEntryId: null,
+        aiAnalyses: { every: { status: 'rejected' } },
+      },
+    });
     expect(prisma.foodEntry.create).not.toHaveBeenCalled();
     expect(prisma.foodList.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps a rejected image that is linked to a food entry', async () => {
+    prisma.aiAnalysis.findFirst.mockResolvedValue({
+      ...awaitingAnalysis(),
+      foodImage: {
+        ...awaitingAnalysis().foodImage,
+        foodEntryId: 'entry-1',
+      },
+    });
+    prisma.aiAnalysis.updateMany.mockResolvedValue({ count: 1 });
+    prisma.aiAnalysis.findUniqueOrThrow.mockResolvedValue({
+      id: 'analysis-1',
+      status: 'rejected',
+    });
+
+    await service.rejectAnalysis('user-1', 'analysis-1');
+
+    expect(prisma.aiAnalysis.count).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prisma.foodImage.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps a rejected image while another analysis still uses it', async () => {
+    prisma.aiAnalysis.findFirst.mockResolvedValue(awaitingAnalysis());
+    prisma.aiAnalysis.updateMany.mockResolvedValue({ count: 1 });
+    prisma.aiAnalysis.count.mockResolvedValue(1);
+    prisma.aiAnalysis.findUniqueOrThrow.mockResolvedValue({
+      id: 'analysis-1',
+      status: 'rejected',
+    });
+
+    await service.rejectAnalysis('user-1', 'analysis-1');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prisma.foodImage.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('preserves rejection when rejected image cleanup fails', async () => {
+    prisma.aiAnalysis.findFirst.mockResolvedValue(awaitingAnalysis());
+    prisma.aiAnalysis.updateMany.mockResolvedValue({ count: 1 });
+    prisma.aiAnalysis.findUniqueOrThrow.mockResolvedValue({
+      id: 'analysis-1',
+      status: 'rejected',
+    });
+    fetchMock.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(
+      service.rejectAnalysis('user-1', 'analysis-1'),
+    ).resolves.toMatchObject({ status: 'rejected' });
+
+    expect(prisma.foodImage.deleteMany).not.toHaveBeenCalled();
   });
 
   it('retries an analysis using the existing image', async () => {
@@ -376,6 +446,7 @@ describe('NutritionAnalysisService', () => {
       },
       foodImage: {
         id: 'image-1',
+        foodEntryId: null,
         storagePath: 'users/user-1/meal-images/meal.jpg',
         mimeType: 'image/jpeg',
       },
