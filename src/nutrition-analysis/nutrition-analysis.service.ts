@@ -84,7 +84,6 @@ export class NutritionAnalysisService {
     return {
       id: image.id,
       storagePath,
-      publicUrl: image.publicUrl ?? null,
       mimeType: file.mimetype,
       sizeBytes: file.size,
       bucket,
