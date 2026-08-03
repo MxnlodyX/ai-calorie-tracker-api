@@ -196,7 +196,7 @@ Supported query params:
 date
 from
 to
-limit
+limit (1-100, default 50)
 offset
 ```
 
@@ -284,7 +284,7 @@ Returns saved food nutrition items for the current user.
 Supported query params:
 
 ```text
-limit
+limit (1-100, default 50)
 offset
 ```
 
