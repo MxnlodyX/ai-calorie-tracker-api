@@ -12,6 +12,7 @@ import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { HttpLoggingMiddleware } from './common/middleware/http-logging.middleware';
 import { FoodsModule } from './foods/foods.module';
+import { NutritionAnalysisModule } from './nutrition-analysis/nutrition-analysis.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
     AuthenticationModule,
     UsersModule,
     FoodsModule,
+    NutritionAnalysisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

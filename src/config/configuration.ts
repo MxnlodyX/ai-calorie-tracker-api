@@ -21,5 +21,14 @@ export default () => ({
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackUrl: process.env.GOOGLE_CALLBACK_URL,
   },
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY,
+    imageAnalysisModel: process.env.OPENAI_IMAGE_ANALYSIS_MODEL,
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'meal-images',
+  },
   nodeEnv: process.env.NODE_ENV ?? 'development',
 });
