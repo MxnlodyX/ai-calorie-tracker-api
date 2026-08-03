@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
@@ -66,6 +70,12 @@ describe('NutritionAnalysisService', () => {
     const result = await service.uploadImage('user-1', mealImage());
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
+      }),
+    );
     expect(prisma.foodImage.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
@@ -76,6 +86,32 @@ describe('NutritionAnalysisService', () => {
     expect(prisma.aiAnalysis.create).not.toHaveBeenCalled();
     expect(prisma.foodEntry.create).not.toHaveBeenCalled();
     expect(result.id).toBe('image-1');
+  });
+
+  it('maps an aborted storage request to a safe availability error', async () => {
+    fetchMock.mockRejectedValueOnce(
+      new DOMException('The operation timed out', 'TimeoutError'),
+    );
+
+    await expect(
+      service.uploadImage('user-1', mealImage()),
+    ).rejects.toMatchObject({
+      message: 'Unable to upload meal image',
+      status: 503,
+    });
+
+    expect(prisma.foodImage.create).not.toHaveBeenCalled();
+  });
+
+  it('does not expose or read a Supabase error response body', async () => {
+    const text = jest.fn().mockResolvedValue('internal storage details');
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 500, text });
+    const upload = service.uploadImage('user-1', mealImage());
+
+    await expect(upload).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(upload).rejects.toThrow('Unable to upload meal image');
+
+    expect(text).not.toHaveBeenCalled();
   });
 
   it('deletes the uploaded object when the image record cannot be created', async () => {
@@ -151,6 +187,20 @@ describe('NutritionAnalysisService', () => {
     });
     expect(prisma.foodEntry.create).not.toHaveBeenCalled();
     expect(prisma.foodList.create).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.any(String),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.openai.com/v1/responses',
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
+      }),
+    );
     expect(result.analysis.status).toBe('awaiting_confirmation');
   });
 
