@@ -16,11 +16,27 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/health (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/health')
       .expect(200)
-      .expect('Hello World!');
+      .expect({
+        message: 'Backend is running',
+        data: { status: 'ok' },
+      });
+  });
+
+  it.each([
+    ['GET', '/users/profile'],
+    ['GET', '/foods'],
+    ['POST', '/upload/food-image'],
+  ])('protects %s %s without an authenticated session', (method, path) => {
+    const call =
+      method === 'GET'
+        ? request(app.getHttpServer()).get(path)
+        : request(app.getHttpServer()).post(path);
+
+    return call.expect(401);
   });
 
   afterEach(async () => {
