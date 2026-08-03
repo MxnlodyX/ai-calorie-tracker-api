@@ -1,8 +1,18 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  const configService = app.get(ConfigService);
+
+  // Cookies are parsed before JwtStrategy reads access_token from the request.
+  app.use(cookieParser());
+  app.enableCors({
+    origin: configService.getOrThrow<string>('frontendUrl'),
+    credentials: true,
+  });
+  await app.listen(process.env.PORT ?? 4000);
 }
-bootstrap();
+void bootstrap();
