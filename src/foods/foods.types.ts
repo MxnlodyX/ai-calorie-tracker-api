@@ -32,3 +32,12 @@ export type FoodQuery = {
   limit?: unknown;
   offset?: unknown;
 };
+
+export type MealCalendarMonthQuery = {
+  month?: unknown;
+  year?: unknown;
+};
+
+export type MealCalendarDateQuery = {
+  date?: unknown;
+};
