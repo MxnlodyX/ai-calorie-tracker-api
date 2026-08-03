@@ -59,12 +59,7 @@ Support the add-food menu options used by the frontend.
 Note:
 Most of the visible toggle UI belongs in the frontend repo. Backend work should only exist if the frontend needs stored preferences or available add-entry options.
 
-Possible backend endpoints:
-
-```text
-GET /nutrition-entry-options
-PUT /users/preferences/add-menu
-```
+No backend endpoint is required while these options remain fixed in the frontend.
 
 Done when:
 
@@ -113,11 +108,11 @@ Includes:
 - daily macro totals
 - simple filtering
 
-Recommended endpoints:
+Use the existing food-entry endpoints:
 
 ```text
-GET /history
-GET /history/daily-summary
+GET /foods?date=2026-08-02
+GET /foods?from=2026-08-01&to=2026-08-07
 ```
 
 Example filters:
