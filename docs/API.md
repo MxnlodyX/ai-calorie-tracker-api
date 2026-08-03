@@ -149,34 +149,6 @@ Example response:
 }
 ```
 
-## Add Menu Options
-
-### `GET /nutrition-entry-options`
-
-Returns supported ways to add nutrition entries.
-
-Example response:
-
-```json
-{
-  "data": [
-    {
-      "id": "manual",
-      "label": "Manual entry",
-      "enabled": true
-    },
-    {
-      "id": "ai-image",
-      "label": "AI image analysis",
-      "enabled": false
-    }
-  ]
-}
-```
-
-Note:
-The toggle UI itself belongs in the frontend. Backend should only store preferences or expose option availability if needed.
-
 ## Manual Food Entries
 
 ### `POST /foods`
@@ -327,36 +299,6 @@ Updates one saved food item owned by the current user.
 ### `DELETE /food-lists/:id`
 
 Deletes one saved food item owned by the current user.
-
-## Nutrition History
-
-### `GET /history`
-
-Returns food entries grouped or filtered by date.
-
-Example:
-
-```text
-GET /history?from=2026-08-01&to=2026-08-07
-```
-
-### `GET /history/daily-summary`
-
-Returns total calories and macros for a day or date range.
-
-Example response:
-
-```json
-{
-  "data": {
-    "date": "2026-08-02",
-    "calories": 1840,
-    "proteinG": 120,
-    "carbsG": 210,
-    "fatG": 55
-  }
-}
-```
 
 ## Upload
 
