@@ -176,10 +176,10 @@ Example response:
   "data": {
     "id": "food_123",
     "userId": "dev-user",
-    "foodName": "Chicken rice",
-    "calories": 620,
+    "name": "Chicken rice",
+    "kcal": 620,
     "proteinG": 35,
-    "carbsG": 70,
+    "carbG": 70,
     "fatG": 20,
     "eatenAt": "2026-08-02T12:30:00.000Z"
   }
@@ -321,7 +321,9 @@ Example response:
   "data": {
     "id": "img_123",
     "storagePath": "food-images/dev-user/1722600000000-meal.jpg",
-    "publicUrl": "https://example.supabase.co/storage/v1/object/public/food-images/dev-user/1722600000000-meal.jpg"
+    "mimeType": "image/jpeg",
+    "sizeBytes": 245760,
+    "bucket": "meal-images"
   }
 }
 ```
