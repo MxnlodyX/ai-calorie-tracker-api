@@ -12,6 +12,13 @@ export type AuthenticatedUser = {
   email: string;
   name: string | null;
   image: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  dietMode: string | null;
+  kcalGoal: number | null;
+  proteinGoal: number | null;
+  fatGoal: number | null;
+  carbGoal: number | null;
 };
 
 export type GoogleCallbackRequest = Request & { user: GoogleUserProfile };
