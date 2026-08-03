@@ -13,6 +13,6 @@ async function bootstrap() {
     origin: configService.getOrThrow<string>('frontendUrl'),
     credentials: true,
   });
-  await app.listen(process.env.PORT ?? 4000);
+  await app.listen(Number(process.env.PORT) || 4000);
 }
 void bootstrap();
