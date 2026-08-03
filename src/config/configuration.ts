@@ -24,11 +24,13 @@ export default () => ({
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
     imageAnalysisModel: process.env.OPENAI_IMAGE_ANALYSIS_MODEL,
+    requestTimeoutMs: Number(process.env.OPENAI_REQUEST_TIMEOUT_MS ?? 30_000),
   },
   supabase: {
     url: process.env.SUPABASE_URL,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'meal-images',
+    requestTimeoutMs: Number(process.env.SUPABASE_REQUEST_TIMEOUT_MS ?? 10_000),
   },
   nodeEnv: process.env.NODE_ENV ?? 'development',
 });
