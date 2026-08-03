@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MAX_NUTRITION_IMAGE_SIZE_BYTES } from './nutrition-analysis.constants';
 import { NUTRITION_IMAGE_ANALYSIS_SYSTEM_PROMPT } from './nutrition-analysis.prompts';
 import type {
   ConfirmNutritionAnalysisBody,
@@ -26,7 +27,6 @@ type UploadedFile = {
 };
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 const FOOD_ENTRY_SELECT = {
@@ -386,7 +386,7 @@ export class NutritionAnalysisService {
     if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
       throw new BadRequestException('image must be JPEG, PNG, or WebP');
     }
-    if (file.size <= 0 || file.size > MAX_IMAGE_SIZE_BYTES) {
+    if (file.size <= 0 || file.size > MAX_NUTRITION_IMAGE_SIZE_BYTES) {
       throw new BadRequestException('image must be between 1 byte and 5MB');
     }
   }
