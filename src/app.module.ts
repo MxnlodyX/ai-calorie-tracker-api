@@ -11,12 +11,14 @@ import { AuthenticationModule } from './authentication/authentication.module';
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { HttpLoggingMiddleware } from './common/middleware/http-logging.middleware';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     PrismaModule,
     AuthenticationModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

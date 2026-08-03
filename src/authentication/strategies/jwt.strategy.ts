@@ -35,7 +35,19 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // access immediately, then forward the safe fields as request.user.
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, name: true, image: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        image: true,
+        heightCm: true,
+        weightKg: true,
+        dietMode: true,
+        kcalGoal: true,
+        proteinGoal: true,
+        fatGoal: true,
+        carbGoal: true,
+      },
     });
 
     if (!user) {
