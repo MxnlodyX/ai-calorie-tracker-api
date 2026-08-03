@@ -29,6 +29,10 @@ type UploadedFile = {
   size: number;
 };
 
+type OwnedAnalysis = Prisma.AiAnalysisGetPayload<{
+  include: { foodImage: true };
+}>;
+
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
@@ -260,6 +264,7 @@ export class NutritionAnalysisService {
     if (rejected.count !== 1) {
       throw new ConflictException('AI analysis was already handled');
     }
+    await this.cleanupRejectedImage(analysis);
     return this.prisma.aiAnalysis.findUniqueOrThrow({
       where: { id: analysisId },
     });
@@ -469,13 +474,12 @@ export class NutritionAnalysisService {
   private async deleteFromSupabase(
     bucket: string,
     storagePath: string,
-  ): Promise<void> {
-    const supabaseUrl = this.configService.getOrThrow<string>('supabase.url');
-    const serviceRoleKey = this.configService.getOrThrow<string>(
-      'supabase.serviceRoleKey',
-    );
-
+  ): Promise<boolean> {
     try {
+      const supabaseUrl = this.configService.getOrThrow<string>('supabase.url');
+      const serviceRoleKey = this.configService.getOrThrow<string>(
+        'supabase.serviceRoleKey',
+      );
       const response = await this.fetchExternal(
         `${supabaseUrl}/storage/v1/object/${bucket}`,
         {
@@ -494,13 +498,54 @@ export class NutritionAnalysisService {
       );
       if (!response.ok) {
         this.logger.error(
-          `Unable to clean up Supabase object after database failure: status ${response.status}`,
+          `Unable to clean up Supabase object: status ${response.status}`,
         );
+        return false;
       }
+      return true;
     } catch {
-      this.logger.error(
-        'Unable to clean up Supabase object after database failure',
+      this.logger.error('Unable to clean up Supabase object');
+      return false;
+    }
+  }
+
+  private async cleanupRejectedImage(analysis: OwnedAnalysis): Promise<void> {
+    const image = analysis.foodImage;
+    if (!image || image.foodEntryId !== null) {
+      return;
+    }
+
+    try {
+      const analysesUsingImage = await this.prisma.aiAnalysis.count({
+        where: {
+          foodImageId: image.id,
+          status: { not: 'rejected' },
+        },
+      });
+      if (analysesUsingImage > 0) {
+        return;
+      }
+
+      const bucket = this.configService.getOrThrow<string>(
+        'supabase.storageBucket',
       );
+      const objectDeleted = await this.deleteFromSupabase(
+        bucket,
+        image.storagePath,
+      );
+      if (!objectDeleted) {
+        return;
+      }
+
+      await this.prisma.foodImage.deleteMany({
+        where: {
+          id: image.id,
+          foodEntryId: null,
+          aiAnalyses: { every: { status: 'rejected' } },
+        },
+      });
+    } catch {
+      this.logger.error('Unable to finalize rejected image cleanup');
     }
   }
 
