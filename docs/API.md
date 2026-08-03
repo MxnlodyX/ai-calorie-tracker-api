@@ -289,6 +289,43 @@ Updates one food entry owned by the current user.
 
 Deletes one food entry owned by the current user.
 
+## Meal Calendar History
+
+Calendar history endpoints return food entries owned by the current authenticated user.
+
+### `GET /meal-calendar-history`
+
+Returns all food entries for a selected month and year.
+
+Supported query params:
+
+```text
+month
+year
+```
+
+Example:
+
+```text
+GET /meal-calendar-history?month=8&year=2026
+```
+
+### `GET /meal-calendar-history/date`
+
+Returns all food entries for one calendar date.
+
+Supported query params:
+
+```text
+date
+```
+
+Example:
+
+```text
+GET /meal-calendar-history/date?date=2026-08-02
+```
+
 ## Food List
 
 Reusable nutrition records owned by the current user. These are stored in `FoodList`

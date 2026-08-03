@@ -91,6 +91,68 @@ describe('FoodsService', () => {
     });
   });
 
+  it('lists food entries for a calendar month', async () => {
+    prisma.foodEntry.findMany.mockResolvedValue([]);
+    prisma.foodEntry.count.mockResolvedValue(0);
+
+    await service.listMealCalendarMonth('user-1', {
+      month: '8',
+      year: '2026',
+    });
+
+    expect(prisma.foodEntry.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        eatenAt: {
+          gte: new Date('2026-08-01T00:00:00.000Z'),
+          lt: new Date('2026-09-01T00:00:00.000Z'),
+        },
+      },
+      orderBy: { eatenAt: 'asc' },
+      select: expect.any(Object),
+    });
+    expect(prisma.foodEntry.count).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        eatenAt: {
+          gte: new Date('2026-08-01T00:00:00.000Z'),
+          lt: new Date('2026-09-01T00:00:00.000Z'),
+        },
+      },
+    });
+  });
+
+  it('lists food entries for a calendar date', async () => {
+    prisma.foodEntry.findMany.mockResolvedValue([]);
+    prisma.foodEntry.count.mockResolvedValue(0);
+
+    await service.listMealCalendarDate('user-1', {
+      date: '2026-08-02',
+    });
+
+    expect(prisma.foodEntry.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        eatenAt: {
+          gte: new Date('2026-08-02T00:00:00.000Z'),
+          lt: new Date('2026-08-03T00:00:00.000Z'),
+        },
+      },
+      orderBy: { eatenAt: 'asc' },
+      select: expect.any(Object),
+    });
+  });
+
+  it('rejects invalid calendar month and date filters', async () => {
+    await expect(
+      service.listMealCalendarMonth('user-1', { month: '13', year: '2026' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.listMealCalendarDate('user-1', { date: '2026-8-2' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.foodEntry.findMany).not.toHaveBeenCalled();
+  });
+
   it('updates only food entries owned by the current user', async () => {
     prisma.foodEntry.findFirstOrThrow.mockResolvedValue({});
     prisma.foodEntry.update.mockResolvedValue({});

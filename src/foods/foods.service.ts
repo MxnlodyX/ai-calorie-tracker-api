@@ -1,7 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { FoodEntryBody, FoodListBody, FoodQuery } from './foods.types';
+import type {
+  FoodEntryBody,
+  FoodListBody,
+  FoodQuery,
+  MealCalendarDateQuery,
+  MealCalendarMonthQuery,
+} from './foods.types';
 
 const FOOD_ENTRY_SELECT = {
   id: true,
@@ -64,6 +70,23 @@ export class FoodsService {
     ]);
 
     return { items, total };
+  }
+
+  async listMealCalendarMonth(userId: string, query: MealCalendarMonthQuery) {
+    const month = this.requiredMonth(query.month);
+    const year = this.requiredYear(query.year);
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+
+    return this.listCalendarEntries(userId, start, end);
+  }
+
+  async listMealCalendarDate(userId: string, query: MealCalendarDateQuery) {
+    const start = this.parseDateOnly(query.date, 'date');
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+
+    return this.listCalendarEntries(userId, start, end);
   }
 
   async getEntry(userId: string, id: string) {
@@ -243,6 +266,23 @@ export class FoodsService {
     };
   }
 
+  private async listCalendarEntries(userId: string, start: Date, end: Date) {
+    const where: Prisma.FoodEntryWhereInput = {
+      userId,
+      eatenAt: { gte: start, lt: end },
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.foodEntry.findMany({
+        where,
+        orderBy: { eatenAt: 'asc' },
+        select: FOOD_ENTRY_SELECT,
+      }),
+      this.prisma.foodEntry.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
   private requiredString(value: unknown, field: string): string {
     if (typeof value !== 'string') {
       throw new BadRequestException(`${field} must be a string`);
@@ -311,6 +351,22 @@ export class FoodsService {
       throw new BadRequestException(`${field} must be a non-negative integer`);
     }
     return number;
+  }
+
+  private requiredMonth(value: unknown): number {
+    const month = this.requiredPositiveInteger(value, 'month');
+    if (month > 12) {
+      throw new BadRequestException('month must be between 1 and 12');
+    }
+    return month;
+  }
+
+  private requiredYear(value: unknown): number {
+    const year = this.requiredPositiveInteger(value, 'year');
+    if (year < 1900 || year > 9999) {
+      throw new BadRequestException('year must be between 1900 and 9999');
+    }
+    return year;
   }
 
   private optionalNonNegativeNumber(
