@@ -149,49 +149,6 @@ Example response:
 }
 ```
 
-## Nutrition Calculator
-
-### `POST /nutrition/calculate`
-
-Calculates calorie and macro targets from profile data.
-
-Example request:
-
-```json
-{
-  "sex": "male",
-  "age": 25,
-  "heightCm": 175,
-  "weightKg": 70,
-  "activityLevel": "moderate",
-  "goal": "maintain"
-}
-```
-
-Example response:
-
-```json
-{
-  "message": "Nutrition target calculated successfully",
-  "data": {
-    "bmr": 1648,
-    "tdee": 2554,
-    "calorieTarget": 2554,
-    "proteinG": 140,
-    "carbsG": 319,
-    "fatG": 71
-  }
-}
-```
-
-### `GET /nutrition/target`
-
-Returns the current user's saved nutrition target.
-
-### `PUT /nutrition/target`
-
-Saves or updates the current user's nutrition target/profile.
-
 ## Add Menu Options
 
 ### `GET /nutrition-entry-options`
