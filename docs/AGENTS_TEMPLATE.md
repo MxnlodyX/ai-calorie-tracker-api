@@ -91,13 +91,13 @@ src/
 
 ## Authentication Rules
 
-The frontend uses NextAuth v4 with Google OAuth.
+The backend owns the login flow using Google OAuth.
 
-Backend authentication should verify the frontend session or token later.
+Backend authentication should create or link the local user, issue backend-managed session/JWT credentials, and expose the current identity through `/authentications/me`.
 
 Do not add Supabase Auth unless explicitly requested.
 
-Do not create a second independent user system.
+Do not create a second independent user system outside the backend auth/user models.
 
 During early development, a temporary `dev-user` id may be used, but it must be clearly marked as temporary.
 
