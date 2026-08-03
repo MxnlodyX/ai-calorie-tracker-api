@@ -54,7 +54,7 @@ Use these feature branches:
 
 ```text
 feature/authentication
-feature/user-nutrition-calculator
+feature/user-nutrition-profile
 feature/add-menu-toggle
 feature/manual-nutrition-entry
 feature/nutrition-history
