@@ -62,7 +62,7 @@ describe('FoodsService', () => {
         mealType: undefined,
         eatenAt: new Date('2026-08-02T12:30:00.000Z'),
       },
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
   });
 
@@ -87,7 +87,7 @@ describe('FoodsService', () => {
       orderBy: { eatenAt: 'desc' },
       take: 10,
       skip: 5,
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
   });
 
@@ -122,7 +122,7 @@ describe('FoodsService', () => {
         },
       },
       orderBy: { eatenAt: 'asc' },
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
     expect(prisma.foodEntry.count).toHaveBeenCalledWith({
       where: {
@@ -152,7 +152,7 @@ describe('FoodsService', () => {
         },
       },
       orderBy: { eatenAt: 'asc' },
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
   });
 
@@ -163,6 +163,9 @@ describe('FoodsService', () => {
     await expect(
       service.listMealCalendarDate('user-1', { date: '2026-8-2' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.listEntries('user-1', { date: '2026-02-31' }),
+    ).rejects.toThrow('date must be a valid date');
     expect(prisma.foodEntry.findMany).not.toHaveBeenCalled();
   });
 
@@ -174,12 +177,12 @@ describe('FoodsService', () => {
 
     expect(prisma.foodEntry.findFirstOrThrow).toHaveBeenCalledWith({
       where: { id: 'entry-1', userId: 'user-1' },
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
     expect(prisma.foodEntry.update).toHaveBeenCalledWith({
       where: { id: 'entry-1' },
       data: { kcal: 700 },
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
   });
 
@@ -205,7 +208,7 @@ describe('FoodsService', () => {
         imageUrl: undefined,
         mealType: undefined,
       },
-      select: expect.any(Object),
+      select: expect.any(Object) as Record<string, unknown>,
     });
   });
 
