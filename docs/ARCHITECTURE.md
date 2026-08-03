@@ -262,7 +262,6 @@ model FoodImage {
   userId      String
   foodEntryId String?
   storagePath String
-  publicUrl   String?
   mimeType    String
   sizeBytes   Int
   createdAt   DateTime @default(now())
