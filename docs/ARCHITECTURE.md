@@ -152,6 +152,13 @@ Examples:
 - normalize AI response
 - save analysis result
 - return estimated nutrition
+- keep the result in `awaiting_confirmation` until the user acts
+- accept edited results atomically before creating a food entry
+- reject without creating food data
+- retry the same owned image without creating food data
+
+Saving accepted nutrition to the reusable `FoodList` is an explicit user choice and
+must default to disabled.
 
 ## Request Flow
 
