@@ -4,13 +4,9 @@ function getFrontendUrl(): string {
   return process.env.FRONTEND_URL ?? defaultFrontendUrl;
 }
 
-function getFrontendOrigin(): string {
-  return process.env.FRONTEND_ORIGIN ?? new URL(getFrontendUrl()).origin;
-}
-
 export default () => ({
   frontendUrl: getFrontendUrl(),
-  frontendOrigin: getFrontendOrigin(),
+  frontendOrigin: process.env.FRONTEND_ORIGIN,
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
