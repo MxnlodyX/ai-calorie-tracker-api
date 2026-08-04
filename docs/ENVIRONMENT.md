@@ -9,6 +9,7 @@ Recommended starter template:
 ```env
 PORT=4000
 FRONTEND_URL="http://localhost:3000"
+FRONTEND_ORIGIN="http://localhost:3000"
 
 DATABASE_URL=""
 DIRECT_URL=""
@@ -37,11 +38,15 @@ Backend:  http://localhost:4000
 
 ## CORS
 
-Enable CORS in `src/main.ts`:
+`FRONTEND_URL` is the post-login redirect destination. `FRONTEND_ORIGIN` is
+the exact origin allowed to make credentialed browser requests to the API. Do
+not include a path or use `*` for `FRONTEND_ORIGIN`.
+
+Enable CORS in `src/main.ts` with the configured origin:
 
 ```ts
 app.enableCors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  origin: configService.getOrThrow<string>('frontendOrigin'),
   credentials: true,
 });
 ```
@@ -54,3 +59,8 @@ app.enableCors({
   credentials: true,
 });
 ```
+
+The backend access cookie is `HttpOnly`. In production it uses `Secure` and
+`SameSite=None` so a frontend hosted on another site can send it. In local
+development it uses `Secure=false` and `SameSite=Lax`. Frontend requests to
+authenticated endpoints must also set `credentials: 'include'`.
