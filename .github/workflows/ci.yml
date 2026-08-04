@@ -21,30 +21,31 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Prisma generate
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      # Prisma generate validates the URL format but does not connect to this DB.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/test
 
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 24
-        cache: 'npm'
-    - name: Install dependencies
-      run: npm ci
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
 
-    - name: Generate Prisma Client
-      run: npx prisma generate
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Lint
-      run: npx eslint "src/**/*.ts" "test/**/*.ts"
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
-    - name: Run tests
-      run: npx jest --runInBand
+      - name: Lint
+        run: npx eslint "src/**/*.ts" "test/**/*.ts"
 
-    - name: Build
-      run: npm run build
+      - name: Run tests
+        run: npx jest --runInBand
+
+      - name: Build
+        run: npm run build
