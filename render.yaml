@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: ai-calorie-tracker-api
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    preDeployCommand: npx --no-install prisma migrate deploy
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_COOKIE_MAX_AGE_MS
+        value: '900000'
+      - key: FRONTEND_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: meal-images
+      - key: SUPABASE_REQUEST_TIMEOUT_MS
+        value: '10000'
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_IMAGE_ANALYSIS_MODEL
+        value: gpt-5-mini
+      - key: OPENAI_REQUEST_TIMEOUT_MS
+        value: '30000'
