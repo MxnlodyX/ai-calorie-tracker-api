@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    branch: main
+    branch: fix/image-ai-nutrition-analyze
     autoDeployTrigger: commit
     buildCommand: npm ci --include=dev && npx prisma generate && npm run build && npx --no-install prisma migrate deploy
     startCommand: npm run start:prod
