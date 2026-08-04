@@ -1,98 +1,137 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# AI Calorie Tracker API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A simple, extensible backend API for tracking meals and estimating calories using AI. Built with TypeScript and NestJS, this project provides REST endpoints for logging meals, querying nutrition estimates, and managing users. It’s intended as the API for an AI‑assisted calorie tracking application or as a starting point for learning how to combine NestJS with AI services.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+- Create, read, update, and delete meal entries
+- Estimate calories and nutrition using an AI model (pluggable provider)
+- User management and basic authentication hooks
+- TypeScript, unit & e2e test scripts, and Docker-friendly configuration
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech stack
 
-## Project setup
+- Node.js + TypeScript
+- NestJS framework
+- (Optional) Any AI provider (e.g., OpenAI) for nutrition estimation
+- Database: developer choice (Postgres, SQLite, etc.) via TypeORM/Prisma (configure in .env)
 
-```bash
-$ npm install
-```
+## Getting started
 
-## Compile and run the project
+Prerequisites:
+
+- Node.js 18+ or later
+- npm or pnpm
+- A database (Postgres recommended for production)
+- (Optional) AI provider API key (e.g. OPENAI_API_KEY) if you want calorie estimation
+
+Install dependencies:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+Copy the example environment file and update values:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
+# Edit .env to set DATABASE_URL, PORT, and AI provider keys
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Run locally (development):
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# watch mode with hot reload
+npm run start:dev
+
+# or run once
+npm run start
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Run production build:
 
-## Resources
+```bash
+npm run build
+npm run start:prod
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Run tests:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+npm run test        # unit tests
+npm run test:e2e    # e2e tests
+npm run test:cov    # coverage
+```
 
-## Support
+Docker (example):
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- Add a Dockerfile and update configuration as needed. This repository is Docker-friendly but does not ship a default image.
 
-## Stay in touch
+## Configuration and environment variables
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Common variables used by the project (adjust names to match your codebase):
+
+- PORT - port the API listens on (default: 3000)
+- DATABASE_URL - database connection string
+- AI_PROVIDER - identifier for the AI service to use (e.g. openai)
+- OPENAI_API_KEY (or other provider-specific key) - API key for AI provider
+
+Note: Check src/config or the environment loading code to confirm exact variable names and add any additional values required.
+
+## API overview
+
+The API is intended to expose REST endpoints. Example endpoints (verify exact routes in src/controllers):
+
+- POST /auth/register — create a new user
+- POST /auth/login — authenticate and return a token
+- GET /meals — list meals for the authenticated user
+- POST /meals — create a meal entry (body: { name, time, description, calories? })
+- GET /meals/:id — fetch a single meal
+- PUT /meals/:id — update a meal
+- DELETE /meals/:id — delete a meal
+- POST /estimate — send a meal description to the AI and receive calorie/nutrition estimates
+
+Authenticate requests with the configured auth mechanism (JWT is common). See src/auth for implementation details.
+
+Example: create a meal
+
+```bash
+curl -X POST http://localhost:3000/meals \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Oatmeal with fruit","description":"1 cup oatmeal, 1/2 cup blueberries, 1 tbsp honey"}'
+```
+
+Estimate calories using AI (example):
+
+```bash
+curl -X POST http://localhost:3000/estimate \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"2 slices of pizza, 1 small salad"}'
+```
+
+## Extensibility
+
+- Swap AI providers by adding a provider service implementing a shared interface
+- Replace or configure the ORM (TypeORM/Prisma) to match your preferred database
+- Add rate limiting, validation, background jobs, or analytics as needed
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome. Please open an issue describing your change before submitting a PR if it’s non-trivial.
+
+Suggested workflow:
+
+1. Fork the repository
+2. Create a feature branch: git checkout -b feat/your-feature
+3. Run and update/add tests
+4. Open a pull request with a clear description of changes
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Specify the project license here (for example, MIT). If you keep the original NestJS license references, ensure you have the right to do so.
+
+## Contact
+
+If you have questions or need help, open an issue in this repository or reach out to the maintainer.
