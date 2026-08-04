@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Prisma generate validates the URL format but does not connect to this DB.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/test
 
