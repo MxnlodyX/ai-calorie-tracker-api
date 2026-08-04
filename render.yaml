@@ -6,8 +6,7 @@ services:
     region: singapore
     branch: main
     autoDeployTrigger: commit
-    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
-    preDeployCommand: npx --no-install prisma migrate deploy
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build && npx --no-install prisma migrate deploy
     startCommand: npm run start:prod
     healthCheckPath: /health
     envVars:
