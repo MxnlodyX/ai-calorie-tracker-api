@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { optionalMealType } from '../common/meal-type';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   FoodEntryBody,
@@ -76,18 +77,22 @@ export class FoodsService {
   async listMealCalendarMonth(userId: string, query: MealCalendarMonthQuery) {
     const month = this.requiredMonth(query.month);
     const year = this.requiredYear(query.year);
-    const start = new Date(Date.UTC(year, month - 1, 1));
-    const end = new Date(Date.UTC(year, month, 1));
+    const range = this.resolveCalendarRange(
+      query,
+      new Date(Date.UTC(year, month - 1, 1)),
+      new Date(Date.UTC(year, month, 1)),
+    );
 
-    return this.listCalendarEntries(userId, start, end);
+    return this.listCalendarEntries(userId, range.start, range.end);
   }
 
   async listMealCalendarDate(userId: string, query: MealCalendarDateQuery) {
     const start = this.parseDateOnly(query.date, 'date');
     const end = new Date(start);
     end.setUTCDate(end.getUTCDate() + 1);
+    const range = this.resolveCalendarRange(query, start, end);
 
-    return this.listCalendarEntries(userId, start, end);
+    return this.listCalendarEntries(userId, range.start, range.end);
   }
 
   async getEntry(userId: string, id: string) {
@@ -163,7 +168,7 @@ export class FoodsService {
       fatG: this.optionalNonNegativeNumber(body.fatG, 'fatG'),
       carbG: this.optionalNonNegativeNumber(body.carbG ?? body.carbsG, 'carbG'),
       imageUrl: this.optionalString(body.imageUrl, 'imageUrl'),
-      mealType: this.optionalString(body.mealType, 'mealType'),
+      mealType: optionalMealType(body.mealType),
       eatenAt: this.optionalDate(body.eatenAt, 'eatenAt') ?? undefined,
     };
   }
@@ -186,7 +191,7 @@ export class FoodsService {
       carbG: this.optionalNonNegativeNumber(body.carbG ?? body.carbsG, 'carbG'),
       description: this.optionalString(body.description, 'description'),
       imageUrl: this.optionalString(body.imageUrl, 'imageUrl'),
-      mealType: this.optionalString(body.mealType, 'mealType'),
+      mealType: optionalMealType(body.mealType),
     };
   }
 
@@ -229,7 +234,7 @@ export class FoodsService {
       data.imageUrl = this.optionalString(body.imageUrl, 'imageUrl');
     }
     if (body.mealType !== undefined) {
-      data.mealType = this.optionalString(body.mealType, 'mealType');
+      data.mealType = optionalMealType(body.mealType);
     }
   }
 
@@ -242,7 +247,8 @@ export class FoodsService {
       const start = this.parseDateOnly(query.date, 'date');
       const end = new Date(start);
       end.setUTCDate(end.getUTCDate() + 1);
-      where.eatenAt = { gte: start, lt: end };
+      const range = this.resolveCalendarRange(query, start, end);
+      where.eatenAt = { gte: range.start, lt: range.end };
       return where;
     }
 
@@ -288,6 +294,30 @@ export class FoodsService {
     ]);
 
     return { items, total };
+  }
+
+  private resolveCalendarRange(
+    query: { from?: unknown; to?: unknown },
+    fallbackStart: Date,
+    fallbackEnd: Date,
+  ): { start: Date; end: Date } {
+    const hasFrom = query.from !== undefined;
+    const hasTo = query.to !== undefined;
+
+    if (!hasFrom && !hasTo) {
+      return { start: fallbackStart, end: fallbackEnd };
+    }
+    if (!hasFrom || !hasTo) {
+      throw new BadRequestException('from and to must be provided together');
+    }
+
+    const start = this.requiredDate(query.from, 'from');
+    const end = this.requiredDate(query.to, 'to');
+    if (start >= end) {
+      throw new BadRequestException('to must be after from');
+    }
+
+    return { start, end };
   }
 
   private requiredString(value: unknown, field: string): string {

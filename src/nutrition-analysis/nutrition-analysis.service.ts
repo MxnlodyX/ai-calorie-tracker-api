@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import { optionalMealType } from '../common/meal-type';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DEFAULT_OPENAI_REQUEST_TIMEOUT_MS,
@@ -180,9 +181,8 @@ export class NutritionAnalysisService {
       body.carbG ?? body.carbsG ?? analysis.carbG,
       'carbG',
     );
-    const mealType = this.optionalString(
+    const mealType = optionalMealType(
       body.mealType === undefined ? defaults.mealType : body.mealType,
-      'mealType',
     );
     const eatenAt =
       this.optionalDate(
@@ -312,11 +312,23 @@ export class NutritionAnalysisService {
     analysisId: string,
     file: UploadedFile,
     model: string,
-    entryDefaults: { mealType?: unknown; eatenAt?: unknown },
+    entryDefaults: {
+      mealType?: unknown;
+      eatenAt?: unknown;
+      manualDescription?: unknown;
+    },
   ) {
-    const mealType = this.optionalString(entryDefaults.mealType, 'mealType');
+    const mealType = optionalMealType(entryDefaults.mealType);
     const eatenAt = this.optionalDate(entryDefaults.eatenAt, 'eatenAt');
-    const nutrition = await this.requestOpenAiAnalysis(file, model);
+    const manualDescription = this.optionalString(
+      entryDefaults.manualDescription,
+      'manualDescription',
+    );
+    const nutrition = await this.requestOpenAiAnalysis(
+      file,
+      model,
+      manualDescription,
+    );
 
     return this.prisma.aiAnalysis.update({
       where: { id: analysisId },
@@ -333,6 +345,7 @@ export class NutritionAnalysisService {
           entryDefaults: {
             mealType: mealType ?? null,
             eatenAt: eatenAt?.toISOString() ?? null,
+            manualDescription: manualDescription ?? null,
           },
         },
       },
@@ -366,6 +379,7 @@ export class NutritionAnalysisService {
   private readEntryDefaults(value: Prisma.JsonValue): {
     mealType?: unknown;
     eatenAt?: unknown;
+    manualDescription?: unknown;
   } {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return {};
@@ -381,6 +395,7 @@ export class NutritionAnalysisService {
     return {
       mealType: entryDefaults.mealType,
       eatenAt: entryDefaults.eatenAt,
+      manualDescription: entryDefaults.manualDescription,
     };
   }
 
@@ -552,6 +567,7 @@ export class NutritionAnalysisService {
   private async requestOpenAiAnalysis(
     file: UploadedFile,
     model: string,
+    manualDescription: string | null | undefined,
   ): Promise<NutritionAnalysisResult> {
     const apiKey = this.configService.getOrThrow<string>('openai.apiKey');
     const response = await this.fetchExternal(
@@ -579,7 +595,7 @@ export class NutritionAnalysisService {
               content: [
                 {
                   type: 'input_text',
-                  text: 'Analyze this meal image for nutrition tracking.',
+                  text: this.buildAnalysisRequestText(manualDescription),
                 },
                 {
                   type: 'input_image',
@@ -611,6 +627,17 @@ export class NutritionAnalysisService {
     }
 
     return this.parseNutritionResult(outputText);
+  }
+
+  private buildAnalysisRequestText(
+    manualDescription: string | null | undefined,
+  ): string {
+    const request = 'Analyze this meal image for nutrition tracking.';
+    if (!manualDescription) {
+      return request;
+    }
+
+    return `${request}\nUser-provided meal details: ${manualDescription}`;
   }
 
   private async fetchExternal(

@@ -2,6 +2,7 @@ export type NutritionAnalyzeBody = {
   foodImageId?: unknown;
   mealType?: unknown;
   eatenAt?: unknown;
+  manualDescription?: unknown;
 };
 
 export type ConfirmNutritionAnalysisBody = {
