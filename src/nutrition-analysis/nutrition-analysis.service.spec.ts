@@ -175,6 +175,7 @@ describe('NutritionAnalysisService', () => {
       foodImageId: 'image-1',
       mealType: 'lunch',
       eatenAt: '2026-08-04T05:00:00.000Z',
+      manualDescription: 'Grilled chicken with half a cup of rice.',
     });
 
     expect(prisma.foodImage.findFirst).toHaveBeenCalledWith({
@@ -202,6 +203,20 @@ describe('NutritionAnalysisService', () => {
       'https://api.openai.com/v1/responses',
       expect.objectContaining({
         signal: expect.any(AbortSignal) as AbortSignal,
+        body: expect.stringContaining(
+          'User-provided meal details: Grilled chicken with half a cup of rice.',
+        ) as string,
+      }),
+    );
+    expect(prisma.aiAnalysis.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          rawAiResponse: expect.objectContaining({
+            entryDefaults: expect.objectContaining({
+              manualDescription: 'Grilled chicken with half a cup of rice.',
+            }) as Record<string, unknown>,
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>,
       }),
     );
     expect(result.analysis.status).toBe('awaiting_confirmation');
@@ -401,6 +416,21 @@ describe('NutritionAnalysisService', () => {
     await expect(
       service.acceptAnalysis('user-1', 'analysis-1', {}),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects an unsupported meal type before creating food', async () => {
+    prisma.aiAnalysis.findFirst.mockResolvedValue(awaitingAnalysis());
+
+    await expect(
+      service.acceptAnalysis('user-1', 'analysis-1', {
+        mealType: 'brunch',
+      }),
+    ).rejects.toThrow(
+      'mealType must be one of: breakfast, lunch, dinner, additional',
+    );
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.foodEntry.create).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported image types before external calls', async () => {

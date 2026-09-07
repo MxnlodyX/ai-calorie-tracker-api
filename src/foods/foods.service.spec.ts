@@ -66,6 +66,33 @@ describe('FoodsService', () => {
     });
   });
 
+  it('normalizes supported meal types and rejects unknown values', async () => {
+    prisma.foodEntry.create.mockResolvedValue({});
+
+    await service.createEntry('user-1', {
+      name: 'Chicken rice',
+      kcal: 620,
+      mealType: 'Lunch',
+    });
+
+    expect(prisma.foodEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ mealType: 'lunch' }) as object,
+      }),
+    );
+
+    await expect(
+      service.createEntry('user-1', {
+        name: 'Cake',
+        kcal: 100,
+        mealType: 'brunch',
+      }),
+    ).rejects.toThrow(
+      'mealType must be one of: breakfast, lunch, dinner, additional',
+    );
+    expect(prisma.foodEntry.create).toHaveBeenCalledTimes(1);
+  });
+
   it('filters food entries by date and paginates', async () => {
     prisma.foodEntry.findMany.mockResolvedValue([]);
     prisma.foodEntry.count.mockResolvedValue(0);
@@ -89,6 +116,29 @@ describe('FoodsService', () => {
       skip: 5,
       select: expect.any(Object) as Record<string, unknown>,
     });
+  });
+
+  it('uses client local day boundaries when filtering food entries', async () => {
+    prisma.foodEntry.findMany.mockResolvedValue([]);
+    prisma.foodEntry.count.mockResolvedValue(0);
+
+    await service.listEntries('user-1', {
+      date: '2026-08-02',
+      from: '2026-08-01T17:00:00.000Z',
+      to: '2026-08-02T17:00:00.000Z',
+    });
+
+    expect(prisma.foodEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-1',
+          eatenAt: {
+            gte: new Date('2026-08-01T17:00:00.000Z'),
+            lt: new Date('2026-08-02T17:00:00.000Z'),
+          },
+        },
+      }),
+    );
   });
 
   it('rejects pagination limits above 100 before querying the database', async () => {
@@ -135,6 +185,30 @@ describe('FoodsService', () => {
     });
   });
 
+  it('uses client local month boundaries for calendar history', async () => {
+    prisma.foodEntry.findMany.mockResolvedValue([]);
+    prisma.foodEntry.count.mockResolvedValue(0);
+
+    await service.listMealCalendarMonth('user-1', {
+      month: '8',
+      year: '2026',
+      from: '2026-07-31T17:00:00.000Z',
+      to: '2026-08-31T17:00:00.000Z',
+    });
+
+    expect(prisma.foodEntry.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        eatenAt: {
+          gte: new Date('2026-07-31T17:00:00.000Z'),
+          lt: new Date('2026-08-31T17:00:00.000Z'),
+        },
+      },
+      orderBy: { eatenAt: 'asc' },
+      select: expect.any(Object) as Record<string, unknown>,
+    });
+  });
+
   it('lists food entries for a calendar date', async () => {
     prisma.foodEntry.findMany.mockResolvedValue([]);
     prisma.foodEntry.count.mockResolvedValue(0);
@@ -163,6 +237,21 @@ describe('FoodsService', () => {
     await expect(
       service.listMealCalendarDate('user-1', { date: '2026-8-2' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.listMealCalendarMonth('user-1', {
+        month: '8',
+        year: '2026',
+        from: '2026-08-01T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('from and to must be provided together');
+    await expect(
+      service.listMealCalendarMonth('user-1', {
+        month: '8',
+        year: '2026',
+        from: '2026-09-01T00:00:00.000Z',
+        to: '2026-08-01T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('to must be after from');
     await expect(
       service.listEntries('user-1', { date: '2026-02-31' }),
     ).rejects.toThrow('date must be a valid date');

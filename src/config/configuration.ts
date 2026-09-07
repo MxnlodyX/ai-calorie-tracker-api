@@ -11,6 +11,9 @@ export default () => ({
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
     cookieMaxAgeMs: Number(process.env.JWT_COOKIE_MAX_AGE_MS ?? 900_000),
+    refreshTokenMaxAgeMs: Number(
+      process.env.JWT_REFRESH_TOKEN_MAX_AGE_MS ?? 2_592_000_000,
+    ),
   },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,

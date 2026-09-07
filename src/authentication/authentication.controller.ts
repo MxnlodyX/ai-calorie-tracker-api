@@ -8,8 +8,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Response } from 'express';
-import { AuthService } from './authentication.service';
+import type { Request, Response } from 'express';
+import { AuthService, type AuthTokenPair } from './authentication.service';
 import { AUTHENTICATION_ROUTE } from './authentication.constants';
 import { AuthenticationLogger } from './authentication.logger';
 import type {
@@ -20,6 +20,7 @@ import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const ACCESS_TOKEN_COOKIE = 'access_token';
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
 @Controller(AUTHENTICATION_ROUTE)
 export class AuthController {
@@ -42,12 +43,8 @@ export class AuthController {
   ): Promise<void> {
     // GoogleStrategy placed the normalized profile in request.user. AuthService
     // links it to the database and returns only this backend's signed JWT.
-    const token = await this.authService.signInWithGoogle(request.user);
-
-    response.cookie(ACCESS_TOKEN_COOKIE, token, {
-      ...this.accessCookieOptions(),
-      maxAge: this.configService.getOrThrow<number>('jwt.cookieMaxAgeMs'),
-    });
+    const tokens = await this.authService.signInWithGoogle(request.user);
+    this.setTokenCookies(response, tokens);
     this.authLogger.success(
       'google_oauth',
       6,
@@ -61,6 +58,26 @@ export class AuthController {
       'Login completed; redirecting browser to the frontend',
     );
     response.redirect(this.configService.getOrThrow<string>('frontendUrl'));
+  }
+
+  @Post('refresh')
+  @HttpCode(204)
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const cookies = request.cookies as Record<string, string> | undefined;
+
+    const refreshToken = cookies?.[REFRESH_TOKEN_COOKIE];
+
+    try {
+      const tokens = await this.authService.refreshSession(refreshToken);
+
+      this.setTokenCookies(response, tokens);
+    } catch (error: unknown) {
+      this.clearTokenCookies(response);
+      throw error;
+    }
   }
 
   @Get('me')
@@ -78,17 +95,42 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(204)
-  logout(@Res({ passthrough: true }) response: Response): void {
-    // clearCookie must use the same path/security attributes, without maxAge.
-    response.clearCookie(ACCESS_TOKEN_COOKIE, this.accessCookieOptions());
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const cookies = request.cookies as Record<string, string> | undefined;
+    const refreshToken = cookies?.[REFRESH_TOKEN_COOKIE];
+
+    try {
+      await this.authService.revokeSession(refreshToken);
+    } finally {
+      this.clearTokenCookies(response);
+    }
+
     this.authLogger.success(
       'logout',
       1,
       'clear_login_session',
-      'Access token cookie cleared',
+      'Refresh-token family revoked and token cookies cleared',
     );
   }
+  private setTokenCookies(response: Response, tokens: AuthTokenPair): void {
+    response.cookie(ACCESS_TOKEN_COOKIE, tokens.accessToken, {
+      ...this.accessCookieOptions(),
+      maxAge: this.configService.getOrThrow<number>('jwt.cookieMaxAgeMs'),
+    });
 
+    response.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
+      ...this.refreshCookieOptions(),
+      maxAge: this.configService.getOrThrow<number>('jwt.refreshTokenMaxAgeMs'),
+    });
+  }
+  private clearTokenCookies(response: Response): void {
+    response.clearCookie(ACCESS_TOKEN_COOKIE, this.accessCookieOptions());
+
+    response.clearCookie(REFRESH_TOKEN_COOKIE, this.refreshCookieOptions());
+  }
   private accessCookieOptions() {
     const isProduction =
       this.configService.get<string>('nodeEnv') === 'production';
@@ -98,6 +140,18 @@ export class AuthController {
       secure: isProduction,
       sameSite: isProduction ? ('none' as const) : ('lax' as const),
       path: '/',
+    };
+  }
+
+  private refreshCookieOptions() {
+    const isProduction =
+      this.configService.get<string>('nodeEnv') === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: `/${AUTHENTICATION_ROUTE}`,
     };
   }
 }

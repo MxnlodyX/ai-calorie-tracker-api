@@ -67,6 +67,15 @@ Google redirects to this route. The backend validates OAuth state, creates or li
 
 Validates the backend-issued cookie and returns the current database user. Returns `401 Unauthorized` when the cookie is missing, expired, invalid, or belongs to a deleted user.
 
+### `POST /authentications/refresh`
+
+Rotates the HttpOnly refresh-token cookie and issues fresh access and refresh
+cookies. Returns `204 No Content`. Missing, expired, revoked, reused, or unknown
+refresh tokens return `401 Unauthorized` and clear both authentication cookies.
+
+Every successful refresh consumes the previous refresh token. Reuse of a
+consumed token revokes its entire token family.
+
 Example response:
 
 ```json
@@ -87,7 +96,8 @@ Example response:
 
 ### `POST /authentications/logout`
 
-Clears the backend access-token cookie and returns `204 No Content`.
+Revokes the current refresh-token family, clears both authentication cookies,
+and returns `204 No Content`.
 
 Frontend requests that need authentication must include credentials:
 
@@ -203,8 +213,13 @@ offset
 Example:
 
 ```text
-GET /foods?date=2026-08-02
+GET /foods?date=2026-08-02&from=2026-08-01T17%3A00%3A00.000Z&to=2026-08-02T17%3A00%3A00.000Z
 ```
+
+When filtering by `date`, clients should also send `from` and `to` as the UTC
+instants for the start and end of that date in the user's local timezone. The
+range is start-inclusive and end-exclusive. Omitting them preserves the legacy
+UTC-day behavior.
 
 ### `GET /foods/:id`
 
@@ -236,8 +251,13 @@ year
 Example:
 
 ```text
-GET /meal-calendar-history?month=8&year=2026
+GET /meal-calendar-history?month=8&year=2026&from=2026-07-31T17%3A00%3A00.000Z&to=2026-08-31T17%3A00%3A00.000Z
 ```
+
+Clients should send `from` and `to` as the UTC instants for the start and end
+of the selected month in the user's local timezone. The range is start-inclusive
+and end-exclusive. If omitted, the endpoint falls back to UTC month boundaries
+for backwards compatibility.
 
 ### `GET /meal-calendar-history/date`
 
@@ -252,8 +272,12 @@ date
 Example:
 
 ```text
-GET /meal-calendar-history/date?date=2026-08-02
+GET /meal-calendar-history/date?date=2026-08-02&from=2026-08-01T17%3A00%3A00.000Z&to=2026-08-02T17%3A00%3A00.000Z
 ```
+
+As with the month endpoint, `from` and `to` may be supplied to represent the
+user's local calendar-day boundaries. Both values are required when either is
+provided.
 
 ## Food List
 
@@ -339,9 +363,14 @@ Example request:
 
 ```json
 {
-  "foodImageId": "img_123"
+  "foodImageId": "img_123",
+  "manualDescription": "Grilled chicken with half a cup of rice"
 }
 ```
+
+`manualDescription` is optional. When provided, it is included as supporting
+context in the AI image-analysis request (for example, ingredients, portion size,
+or cooking method).
 
 Example response:
 
@@ -396,6 +425,9 @@ Example request:
 
 The same accept operation is also available as
 `POST /analyze/:analysisId/accept`, with `analysisId` supplied in the URL.
+When provided, `mealType` must be one of `breakfast`, `lunch`, `dinner`, or
+`additional`. Matching is case-insensitive and the stored value is normalized to
+lowercase. The same rule applies to Food Entry and Food List create/update APIs.
 
 ### `POST /analyze/:analysisId/reject`
 
