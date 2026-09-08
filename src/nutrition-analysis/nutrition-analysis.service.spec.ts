@@ -203,9 +203,52 @@ describe('NutritionAnalysisService', () => {
       'https://api.openai.com/v1/responses',
       expect.objectContaining({
         signal: expect.any(AbortSignal) as AbortSignal,
-        body: expect.stringContaining(
-          'User-provided meal details: Grilled chicken with half a cup of rice.',
-        ) as string,
+        body: expect.any(String) as string,
+      }),
+    );
+    const fetchCalls = fetchMock.mock.calls as unknown as Array<
+      [string, RequestInit]
+    >;
+    const openAiRequestBody = fetchCalls[1][1].body;
+    expect(typeof openAiRequestBody).toBe('string');
+    if (typeof openAiRequestBody !== 'string') {
+      throw new Error('Expected the OpenAI request body to be a string');
+    }
+    const openAiRequest = JSON.parse(openAiRequestBody) as {
+      input: Array<{ content: Array<Record<string, unknown>> }>;
+      text: { format: Record<string, unknown> };
+    };
+    expect(openAiRequest.input[0].content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'input_text',
+          text: expect.stringContaining('Keep foodName short') as string,
+        }),
+      ]),
+    );
+    expect(openAiRequest.input[1].content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'input_text',
+          text: expect.stringContaining(
+            '<meal_details>\nGrilled chicken with half a cup of rice.\n</meal_details>',
+          ) as string,
+        }),
+        expect.objectContaining({ type: 'input_image', detail: 'high' }),
+      ]),
+    );
+    expect(openAiRequest.text.format).toEqual(
+      expect.objectContaining({
+        type: 'json_schema',
+        name: 'nutrition_image_analysis',
+        strict: true,
+        schema: expect.objectContaining({
+          required: expect.arrayContaining([
+            'foodName',
+            'items',
+            'notes',
+          ]) as unknown,
+        }) as Record<string, unknown>,
       }),
     );
     expect(prisma.aiAnalysis.update).toHaveBeenCalledWith(
